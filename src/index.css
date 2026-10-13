@@ -1,0 +1,133 @@
+@import "tailwindcss";
+
+@keyframes neonPulse {
+  0%, 100% {
+    filter: drop-shadow(0 0 4px #ff003b) drop-shadow(0 0 10px #ff003b);
+    opacity: 0.95;
+  }
+  50% {
+    filter: drop-shadow(0 0 8px #ff1744) drop-shadow(0 0 18px #ff0055);
+    opacity: 1;
+  }
+}
+
+.neon-glow-polyline {
+  animation: neonPulse 2s ease-in-out infinite;
+}
+
+@keyframes laserDash {
+  to {
+    stroke-dashoffset: -40;
+  }
+}
+
+.neon-core-laser {
+  animation: laserDash 1.2s linear infinite;
+}
+
+/* Neon Red & Central University Color Theme Tokens & Utilities */
+:root {
+  --neon-red: #ff073a;
+  --neon-glow: #ff3366;
+  --neon-dark: #0a0a0f;
+  --neon-card: #12121c;
+  --cu-navy: #002147;
+  --cu-navy-deep: #06101e;
+  --cu-crimson: #CE1126;
+  --cu-crimson-dark: #8B0000;
+  --cu-gold: #D4AF37;
+  --cu-gold-glow: #F59E0B;
+}
+
+/* Neon Red Mall Suite Styles & Glows */
+.neon-glow {
+  filter: drop-shadow(0 0 12px rgba(255, 7, 58, 0.8)) drop-shadow(0 0 25px rgba(255, 7, 58, 0.4));
+}
+
+.neon-card-glow {
+  box-shadow: 0 0 35px -5px rgba(255, 7, 58, 0.28);
+}
+
+.cu-navy-glow {
+  box-shadow: 0 0 30px -5px rgba(0, 33, 71, 0.4);
+}
+
+.cu-gold-glow {
+  filter: drop-shadow(0 0 8px rgba(212, 175, 55, 0.6));
+}
+
+@keyframes pulseGlow {
+  0%, 100% {
+    filter: drop-shadow(0 0 10px rgba(255, 7, 58, 0.7));
+    transform: scale(1);
+  }
+  50% {
+    filter: drop-shadow(0 0 22px rgba(255, 7, 58, 1)) drop-shadow(0 0 35px rgba(255, 51, 102, 0.6));
+    transform: scale(1.03);
+  }
+}
+
+.animate-neon-pulse {
+  animation: pulseGlow 3s infinite ease-in-out;
+}
+
+@keyframes floatAnim {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-8px) rotate(1deg);
+  }
+}
+
+.animate-float {
+  animation: floatAnim 4s infinite ease-in-out;
+}
+
+/* Gradient Text for Neon Red + University Crimson */
+.neon-crimson-text {
+  background: linear-gradient(135deg, #ff3366 0%, #ff073a 50%, #CE1126 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.cu-gold-text {
+  background: linear-gradient(135deg, #FDE68A 0%, #D4AF37 50%, #B45309 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Futuristic Neon Red + Collegiate Navy Glass Card */
+.neon-cu-card {
+  background: linear-gradient(160deg, rgba(10, 20, 36, 0.92) 0%, rgba(18, 18, 28, 0.96) 100%);
+  border: 1px solid rgba(255, 7, 58, 0.35);
+  box-shadow: 0 10px 30px -10px rgba(0, 33, 71, 0.5), 0 0 20px rgba(255, 7, 58, 0.15);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.neon-cu-card:hover {
+  border-color: rgba(255, 7, 58, 0.75);
+  box-shadow: 0 15px 40px -10px rgba(0, 33, 71, 0.6), 0 0 30px rgba(255, 7, 58, 0.3);
+  transform: translateY(-2px);
+}
+
+/* Button with Central University Crimson & Neon Red Edge Glow */
+.btn-neon-crimson {
+  background: linear-gradient(135deg, #ff073a 0%, #CE1126 50%, #8B0000 100%);
+  color: #ffffff;
+  font-weight: 800;
+  box-shadow: 0 4px 20px rgba(255, 7, 58, 0.45);
+  transition: all 0.25s ease;
+}
+
+.btn-neon-crimson:hover {
+  background: linear-gradient(135deg, #ff2654 0%, #e0142b 50%, #a30000 100%);
+  box-shadow: 0 6px 28px rgba(255, 7, 58, 0.65);
+  transform: translateY(-1px) scale(1.02);
+}
+
+.btn-neon-crimson:active {
+  transform: translateY(1px) scale(0.98);
+}
+
+

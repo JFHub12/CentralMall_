@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none">
+    <!-- Rounded App Card Background with Gradient -->
+    <rect x="5" y="5" width="90" height="90" rx="24" fill="url(#bg-gradient)" stroke="#ff073a" stroke-width="3" stroke-opacity="0.8"/>
+    
+    <defs>
+        <linearGradient id="bg-gradient" x1="5" y1="5" x2="95" y2="95" gradientUnits="userSpaceOnUse">
+            <stop stop-color="#140206"/>
+            <stop offset="1" stop-color="#26050c"/>
+        </linearGradient>
+        <linearGradient id="neon-gradient" x1="20" y1="20" x2="80" y2="80" gradientUnits="userSpaceOnUse">
+            <stop stop-color="#ff3366"/>
+            <stop offset="1" stop-color="#ff073a"/>
+        </linearGradient>
+    </defs>
+
+    <!-- Stylized Mall Building & Shopping Bag Symbol -->
+    <path d="M30 40H70V78C70 80.2091 68.2091 82 66 82H34C31.7909 82 30 80.2091 30 78V40Z" fill="url(#neon-gradient)" fill-opacity="0.25" stroke="#ff073a" stroke-width="3"/>
+    <path d="M40 40V30C40 24.4772 44.4772 20 50 20C55.5228 20 60 24.4772 60 30V40" stroke="#ff073a" stroke-width="3" stroke-linecap="round"/>
+    
+    <!-- Mall Entrance / Glass Facade Accent -->
+    <path d="M42 82V62C42 60.8954 42.8954 60 44 60H56C57.1046 60 58 60.8954 58 62V82" stroke="#ffffff" stroke-width="2.5" stroke-opacity="0.9"/>
+    
+    <!-- Premium Star / Sparkle Accent -->
+    <path d="M75 25L77.5 32L84.5 34.5L77.5 37L75 44L72.5 37L65.5 34.5L72.5 32L75 25Z" fill="#ff3366"/>
+    <path d="M25 65L26.25 68.5L29.75 69.75L26.25 71L25 74.5L23.75 71L20.25 69.75L23.75 68.5L25 65Z" fill="#ff073a"/>
+</svg>

@@ -1,0 +1,6 @@
+{
+  "name": "Central Mall",
+  "description": "Central University Miotso campus digital hub: Student Marketplace, Campus GPS Navigation, School Clinic Virtual Consultation, and AI Assistant.",
+  "requestFramePermissions": ["geolocation"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
