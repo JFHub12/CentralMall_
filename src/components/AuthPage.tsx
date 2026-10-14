@@ -4,7 +4,7 @@ import {
   User, LogIn, UserPlus, ArrowLeft, Shield, Mail, Lock, Phone, 
   GraduationCap, Store, UserCheck, AlertCircle, CheckCircle2, Camera, Upload, ArrowRight
 } from 'lucide-react';
-import { User as UserType } from '../types';
+import { User as UserType, detectGenderFromName } from '../types';
 import { useTheme, ThemeToggle } from '../context/ThemeContext';
 
 interface AuthPageProps {
@@ -21,6 +21,7 @@ interface StoredAccount {
   studentId?: string;
   phone?: string;
   avatar?: string;
+  gender?: 'male' | 'female' | 'other';
 }
 
 export const AuthPage: React.FC<AuthPageProps> = ({ onLogin, onBackToWelcome }) => {
@@ -65,6 +66,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLogin, onBackToWelcome }) 
   const [phone, setPhone] = useState('');
   const [role, setRole] = useState<'student' | 'merchant' | 'visitor'>('student');
   const [studentId, setStudentId] = useState('');
+  const [gender, setGender] = useState<'male' | 'female' | 'other'>('male');
   const [avatarPreview, setAvatarPreview] = useState<string>('');
 
   // Status & Feedback State
@@ -234,6 +236,13 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLogin, onBackToWelcome }) 
         let serverRes: Response | null = null;
         let serverData: any = null;
 
+        const finalGender = gender || detectGenderFromName(cleanName);
+        const defaultAvatar = finalGender === 'female'
+          ? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=300'
+          : 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&q=80&w=300';
+
+        const finalAvatar = avatarPreview || defaultAvatar;
+
         try {
           serverRes = await fetch('/api/auth/register', {
             method: 'POST',
@@ -243,9 +252,10 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLogin, onBackToWelcome }) 
               email: cleanEmail,
               password: cleanPassword,
               role,
+              gender,
               phone: phone.trim() || undefined,
               studentId: role === 'student' ? (studentId.trim() || `CU-2026-${Math.floor(1000 + Math.random() * 9000)}`) : undefined,
-              avatar: avatarPreview || undefined,
+              avatar: finalAvatar,
             }),
           });
           serverData = await serverRes.json();
@@ -271,9 +281,10 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLogin, onBackToWelcome }) 
             name: cleanName,
             email: cleanEmail,
             role,
+            gender,
             studentId: role === 'student' ? (studentId.trim() || `CU-2026-${Math.floor(1000 + Math.random() * 9000)}`) : undefined,
             phone: phone.trim() || undefined,
-            avatar: avatarPreview || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=300',
+            avatar: finalAvatar,
           };
         }
 
@@ -285,9 +296,10 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLogin, onBackToWelcome }) 
             email: registeredUser.email,
             password: cleanPassword,
             role: registeredUser.role as any,
+            gender,
             studentId: registeredUser.studentId,
             phone: phone.trim(),
-            avatar: avatarPreview || registeredUser.avatar,
+            avatar: finalAvatar,
           });
 
           setSuccessMessage(`Account created successfully! Welcome to Central Mall, ${cleanName}.`);
@@ -514,6 +526,48 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLogin, onBackToWelcome }) 
                     </label>
                     <p className="text-[10px] text-slate-400 mt-1">PNG, JPG, WEBP (Photo preview)</p>
                   </div>
+                </div>
+              </div>
+
+              {/* Gender Selection for Auto Avatar */}
+              <div>
+                <label className={`block text-xs font-bold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                  Gender <span className="text-[10px] text-slate-400 font-normal">(Used for automatic avatar if no picture is added)</span>
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setGender('male')}
+                    className={`py-2 px-2 text-xs font-bold rounded-xl border flex items-center justify-center gap-1 cursor-pointer transition-all ${
+                      gender === 'male'
+                        ? 'bg-[#CE1126] border-[#CE1126] text-white shadow-sm'
+                        : isDark ? 'bg-slate-800 border-slate-700 text-slate-300 hover:border-[#CE1126]' : 'bg-slate-50 border-slate-200 text-slate-600 hover:border-[#CE1126]'
+                    }`}
+                  >
+                    <span>Male</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setGender('female')}
+                    className={`py-2 px-2 text-xs font-bold rounded-xl border flex items-center justify-center gap-1 cursor-pointer transition-all ${
+                      gender === 'female'
+                        ? 'bg-[#CE1126] border-[#CE1126] text-white shadow-sm'
+                        : isDark ? 'bg-slate-800 border-slate-700 text-slate-300 hover:border-[#CE1126]' : 'bg-slate-50 border-slate-200 text-slate-600 hover:border-[#CE1126]'
+                    }`}
+                  >
+                    <span>Female</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setGender('other')}
+                    className={`py-2 px-2 text-xs font-bold rounded-xl border flex items-center justify-center gap-1 cursor-pointer transition-all ${
+                      gender === 'other'
+                        ? 'bg-[#CE1126] border-[#CE1126] text-white shadow-sm'
+                        : isDark ? 'bg-slate-800 border-slate-700 text-slate-300 hover:border-[#CE1126]' : 'bg-slate-50 border-slate-200 text-slate-600 hover:border-[#CE1126]'
+                    }`}
+                  >
+                    <span>Other</span>
+                  </button>
                 </div>
               </div>
 

@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { Product, ProductCategory, CartItem, PaymentMethod, Order } from '../types';
 import { INITIAL_PRODUCTS } from '../data';
+import { CartPushLoadingSVG } from './CartPushLoadingSVG';
 
 interface ShopViewProps {
   user: any;
@@ -532,25 +533,23 @@ export const ShopView: React.FC<ShopViewProps> = ({
 
       {/* Products Grid */}
       {loading ? (
-        <div className="text-center py-20">
-          <div className="w-12 h-12 border-4 border-[#CE1126] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-sm text-slate-600 font-medium">Loading Miotso Marketplace items...</p>
-        </div>
+        <CartPushLoadingSVG 
+          message="Loading Miotso Marketplace items..." 
+          subMessage="Synchronizing live student stalls & items" 
+        />
       ) : filteredProducts.length === 0 ? (
-        <div className="text-center py-16 bg-white border border-red-100 rounded-3xl p-8 shadow-xl shadow-red-100/50">
-          <ShoppingBag className="w-12 h-12 text-[#CE1126]/50 mx-auto mb-3" />
-          <h3 className="text-lg font-bold text-slate-900 mb-1">
-            {selectedCategory === 'My Listed Items' ? 'You have no listed items yet' : 'No products found'}
-          </h3>
-          <p className="text-xs text-slate-500 font-medium mb-4">
-            {selectedCategory === 'My Listed Items' 
+        <div className="flex flex-col items-center">
+          <CartPushLoadingSVG 
+            message={selectedCategory === 'My Listed Items' ? 'You have no listed items yet' : 'No products found'} 
+            subMessage={selectedCategory === 'My Listed Items' 
               ? 'Click "List Item to Sell" above to insert your own photo and publish your product!' 
-              : 'Be the first to list an item with your own picture on Central Mall!'}
-          </p>
+              : 'Be the first to list an item with your own picture on Central Mall!'} 
+          />
           <button
             onClick={() => setShowSellModal(true)}
-            className="px-5 py-2.5 bg-[#CE1126] hover:bg-[#A00D1D] text-white font-extrabold text-xs rounded-full shadow-md shadow-red-200 cursor-pointer"
+            className="mt-4 px-6 py-3 bg-[#CE1126] hover:bg-[#A00D1D] text-white font-extrabold text-xs rounded-full shadow-md shadow-red-200 cursor-pointer flex items-center gap-2"
           >
+            <PlusCircle className="w-4 h-4" />
             Post Item with Picture Now
           </button>
         </div>

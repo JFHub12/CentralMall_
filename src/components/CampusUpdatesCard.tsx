@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { CampusNotice } from '../types';
 import { useTheme } from '../context/ThemeContext';
+import { PenBookLoading3D } from './PenBookLoading3D';
 
 interface CampusUpdatesCardProps {
   onNavigateToOption?: (option: 'shop' | 'gps' | 'clinic', query?: string) => void;
@@ -202,20 +203,15 @@ export const CampusUpdatesCard: React.FC<CampusUpdatesCardProps> = ({ onNavigate
       {/* Notices Grid / List */}
       <div className="relative z-10">
         {loading ? (
-          <div className="py-12 flex flex-col items-center justify-center gap-3 text-center">
-            <RefreshCw className="w-8 h-8 text-[#CE1126] animate-spin" />
-            <p className={`text-xs font-bold ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-              Connecting to central.edu.gh official newsfeed...
-            </p>
-          </div>
+          <PenBookLoading3D 
+            message="Connecting to central.edu.gh official newsfeed..." 
+            subMessage="Synchronizing live campus updates & official notices" 
+          />
         ) : filteredNotices.length === 0 ? (
-          <div className={`py-12 text-center rounded-2xl border ${
-            isDark ? 'bg-slate-800/40 border-slate-800 text-slate-400' : 'bg-slate-50 border-slate-200 text-slate-500'
-          }`}>
-            <AlertCircle className="w-8 h-8 text-amber-500 mx-auto mb-2 opacity-70" />
-            <p className="text-sm font-bold">No campus notices found</p>
-            <p className="text-xs mt-1">Try selecting a different category or clearing your search keywords.</p>
-          </div>
+          <PenBookLoading3D 
+            message="No campus updates or official notices at the moment" 
+            subMessage="Check back soon for official announcements from Central University Ghana." 
+          />
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {filteredNotices.map((notice) => {

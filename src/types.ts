@@ -6,6 +6,7 @@ export interface User {
   role: 'student' | 'merchant' | 'visitor' | 'staff';
   phone?: string;
   avatar?: string;
+  gender?: 'male' | 'female' | 'other';
 }
 
 export type ProductCategory =
@@ -190,4 +191,25 @@ export interface GHSHealthTip {
   iconType: string;
   isDailyFeatured?: boolean;
 }
+
+export function detectGenderFromName(name: string): 'male' | 'female' {
+  if (!name) return 'male';
+  const firstName = name.trim().split(/\s+/)[0].toLowerCase();
+  const femaleNames = [
+    'mary', 'patricia', 'linda', 'barbara', 'elizabeth', 'jennifer', 'maria', 'susan', 'margaret', 'dorothy',
+    'lisa', 'nancy', 'karen', 'betty', 'helen', 'sandra', 'donna', 'carol', 'ruth', 'sharon', 'michelle',
+    'laura', 'sarah', 'kim', 'deborah', 'jessica', 'shirley', 'cynthia', 'angela', 'melissa', 'brenda', 'amy',
+    'anna', 'rebecca', 'virginia', 'kathleen', 'pamela', 'martha', 'debra', 'amanda', 'stephanie', 'carolyn',
+    'christine', 'marie', 'janet', 'catherine', 'frances', 'ann', 'joyce', 'diane', 'alice', 'julie', 'heather',
+    'teresa', 'doris', 'gloria', 'evelyn', 'jean', 'cheryl', 'mildred', 'katherine', 'joan', 'ashley', 'judith',
+    'rose', 'janice', 'kelly', 'nicole', 'judy', 'christina', 'kathy', 'theresa', 'beverly', 'denise', 'tammy',
+    'irene', 'jane', 'lori', 'rachel', 'marilyn', 'andrea', 'kathryn', 'louise', 'sara', 'anne', 'jacqueline',
+    'wanda', 'bonnie', 'julia', 'ruby', 'lois', 'tina', 'phyllis', 'norma', 'paula', 'diana', 'annie', 'lillian',
+    'emily', 'hannah', 'akosua', 'abena', 'yaa', 'afia', 'adwoa', 'amma', 'esi', 'priscilla', 'gifty', 'prudence',
+    'beatrice', 'abigail', 'dorcas', 'esther', 'mercy', 'joanna', 'jessica', 'rachel', 'favour', 'blessing', 'cynthia',
+    'grace', 'faith', 'hope', 'destiny', 'charity', 'joy', 'peace', 'victory', 'queen', 'princes', 'princess'
+  ];
+  return femaleNames.includes(firstName) ? 'female' : 'male';
+}
+
 

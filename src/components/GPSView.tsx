@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import L from 'leaflet';
 import { 
@@ -6,13 +6,13 @@ import {
   Crosshair, X, Building as BuildingIcon, ChevronRight, Bus, Shield, 
   Activity, Zap, Sparkles, CheckCircle2, RotateCcw, Radio, Footprints,
   ArrowRight, CornerUpRight, Play, Pause, ChevronLeft, LocateFixed, RefreshCw,
-  Eye, Stethoscope, Coffee, ZoomIn, ZoomOut, Maximize2, Code, Copy, Check,
-  Sliders, ArrowUpDown, Flame, AlertCircle, Compass as CompassIcon, SlidersHorizontal
+  Eye, EyeOff, Stethoscope, Coffee, ZoomIn, ZoomOut, Maximize2,
+  Sliders, AlertCircle, Compass as CompassIcon, SlidersHorizontal
 } from 'lucide-react';
 import { CENTRAL_BUILDINGS } from '../data/campusData';
-import { CAMPUS_OSM_DATASET, OSMGeoJSONFeature } from '../data/osmData';
 import { Building, BuildingCategory, LiveGPSUser, CampusRouteResult } from '../types';
 import { useTheme, ThemeToggle } from '../context/ThemeContext';
+import { ActionTooltip } from './ActionTooltip';
 
 interface GPSViewProps {
   onBackToDashboard: () => void;
@@ -33,7 +33,7 @@ const TILE_LAYERS = {
     maxZoom: 22
   },
   google_streets: {
-    name: 'Google Roadmap (Roads & Lanes)',
+    name: 'Google Roadmap (Clear Streets)',
     url: 'https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
     subdomains: ['0', '1', '2', '3'],
     attribution: '&copy; Google Maps',
@@ -98,14 +98,6 @@ export const GPSView: React.FC<GPSViewProps> = ({ onBackToDashboard, initialSear
     nextTurnInstruction: 'Proceed straight along designated pathway'
   });
 
-  // OSM & Open-Source Places GeoJSON Inspector & Trigger State
-  const [showOsmInspector, setShowOsmInspector] = useState(false);
-  const [osmFilter, setOsmFilter] = useState<'all' | 'roads' | 'amenities' | 'buildings'>('all');
-  const [isQueryingOverpass, setIsQueryingOverpass] = useState(false);
-  const [overpassStats, setOverpassStats] = useState<string | null>(null);
-  const [copiedJson, setCopiedJson] = useState(false);
-  const [targetedFeature, setTargetedFeature] = useState<OSMGeoJSONFeature | null>(null);
-
   // Live GPS Tracking State
   const [liveLocations, setLiveLocations] = useState<LiveGPSUser[]>([]);
   const [isLiveGpsActive, setIsLiveGpsActive] = useState(true);
@@ -118,7 +110,7 @@ export const GPSView: React.FC<GPSViewProps> = ({ onBackToDashboard, initialSear
     headingDeg: 45,
   });
   const [gpsMessage, setGpsMessage] = useState<string | null>(
-    '⚡ Neon Red Road Navigator Active • Clean Lane View with Zero Map Clutter'
+    '📍 Live Campus Map Active • Central University Miotso'
   );
 
   // Leaflet map refs
@@ -749,81 +741,6 @@ export const GPSView: React.FC<GPSViewProps> = ({ onBackToDashboard, initialSear
     return () => clearInterval(interval);
   }, []);
 
-  // 9. TRIGGER MAP FOCUS ON TARGETED ROAD / LANE / PLACE (From OSM JSON Code Inspector)
-  const triggerMapFocusOnFeature = (feature: OSMGeoJSONFeature) => {
-    const map = mapInstanceRef.current;
-    const focusGroup = targetFocusGroupRef.current;
-    if (!map || !focusGroup) return;
-
-    focusGroup.clearLayers();
-    setTargetedFeature(feature);
-
-    if (feature.geometry.type === 'LineString') {
-      const coords = feature.geometry.coordinates as number[][];
-      const latLngs: L.LatLngExpression[] = coords.map(c => [c[1], c[0]]); // [lat, lng]
-
-      // Highlight target road with pulsating neon beacon
-      const neonRoadHighlight = L.polyline(latLngs, {
-        color: '#ff003b',
-        weight: 8,
-        opacity: 0.9,
-        lineCap: 'round',
-        lineJoin: 'round',
-        className: 'neon-glow-polyline'
-      });
-
-      focusGroup.addLayer(neonRoadHighlight);
-
-      // Fit map to road
-      map.fitBounds(neonRoadHighlight.getBounds(), { padding: [50, 50], maxZoom: 19 });
-      setGpsMessage(`🎯 Targeted Road Focus: "${feature.properties.name}" (${feature.properties.highway || 'road'} • ${feature.properties.lengthMeters || ''}m)`);
-    } else {
-      // Point Feature
-      const coord = feature.geometry.coordinates as number[];
-      const lat = coord[1];
-      const lng = coord[0];
-
-      const focusPulseIcon = L.divIcon({
-        className: 'focus-target-beacon',
-        html: `
-          <div style="transform: translate(-50%, -50%); position: relative; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center;">
-            <div style="position: absolute; width: 44px; height: 44px; border-radius: 999px; background: rgba(255, 0, 59, 0.4); border: 2px solid #ff003b; animation: ping 1.2s infinite;"></div>
-            <div style="width: 20px; height: 20px; border-radius: 999px; background: #ff003b; border: 2px solid #fff; box-shadow: 0 0 12px #ff003b; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 10px;">🎯</div>
-          </div>
-        `,
-        iconSize: [0, 0],
-        iconAnchor: [0, 0]
-      });
-
-      const focusMarker = L.marker([lat, lng], { icon: focusPulseIcon, zIndexOffset: 2000 });
-      focusGroup.addLayer(focusMarker);
-
-      map.flyTo([lat, lng], 18, { duration: 1.2 });
-      setGpsMessage(`🎯 Targeted Place Focus: "${feature.properties.name}" (${lat.toFixed(4)}°N, ${lng.toFixed(4)}°E)`);
-    }
-  };
-
-  // Swap Start and Destination
-  const handleSwapRoute = () => {
-    if (startType === 'gps') {
-      setStartType('building');
-      setStartBuildingId(destBuildingId);
-      setDestBuildingId(detectedBuilding?.id || 'clinic-1');
-    } else {
-      const temp = startBuildingId;
-      setStartBuildingId(destBuildingId);
-      setDestBuildingId(temp);
-    }
-  };
-
-  // Filtered OSM GeoJSON features
-  const filteredOsmFeatures = useMemo(() => {
-    if (osmFilter === 'all') return CAMPUS_OSM_DATASET.features;
-    if (osmFilter === 'roads') return CAMPUS_OSM_DATASET.features.filter(f => f.properties.category === 'road');
-    if (osmFilter === 'amenities') return CAMPUS_OSM_DATASET.features.filter(f => f.properties.category === 'amenity');
-    return CAMPUS_OSM_DATASET.features.filter(f => f.properties.category === 'building' || f.properties.category === 'gate');
-  }, [osmFilter]);
-
   // Deep Search filter
   const trimmedSearch = searchQuery.trim().toLowerCase();
   const filteredBuildings = CENTRAL_BUILDINGS.filter((b) => {
@@ -840,149 +757,145 @@ export const GPSView: React.FC<GPSViewProps> = ({ onBackToDashboard, initialSear
   });
 
   const categories: BuildingCategory[] = ['All', 'Academic', 'Hostels', 'Medical', 'Administrative', 'Amenities', 'Sports'];
-  const startBuilding = CENTRAL_BUILDINGS.find(b => b.id === startBuildingId);
-  const destBuilding = CENTRAL_BUILDINGS.find(b => b.id === destBuildingId);
 
   return (
     <div className={`relative min-h-screen z-10 flex flex-col px-4 py-6 max-w-7xl mx-auto transition-colors duration-300 ${
       isDark ? 'text-slate-100' : 'text-slate-800'
     }`}>
       {/* Top Header Bar */}
-      <div className={`flex flex-wrap items-center justify-between gap-4 mb-5 p-4 rounded-3xl backdrop-blur-md shadow-lg border ${
+      <div className={`flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-5 p-3.5 sm:p-4 lg:p-5 rounded-3xl backdrop-blur-md shadow-lg border transition-all ${
         isDark 
           ? 'bg-slate-900/90 border-slate-800 shadow-black/40 text-white' 
           : 'bg-white/95 border-red-200/80 shadow-red-100/50 text-slate-900'
       }`}>
         <div className="flex items-center gap-3">
-          <button
-            onClick={onBackToDashboard}
-            id="back-to-dashboard-from-gps"
-            className={`p-2.5 rounded-full transition-colors cursor-pointer border ${
-              isDark 
-                ? 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-300 hover:text-white' 
-                : 'bg-slate-100 hover:bg-red-50 border-slate-200 hover:border-red-200 text-slate-600 hover:text-[#CE1126]'
-            }`}
-            title="Back to Dashboard"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </button>
+          <ActionTooltip label="Back to Campus Portal">
+            <button
+              onClick={onBackToDashboard}
+              id="back-to-dashboard-from-gps"
+              aria-label="Back to Campus Portal"
+              className={`w-10 h-10 lg:w-11 lg:h-11 min-w-[40px] min-h-[40px] lg:min-w-[44px] lg:min-h-[44px] rounded-full flex items-center justify-center transition-all cursor-pointer border hover:scale-105 active:scale-95 shrink-0 ${
+                isDark 
+                  ? 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-300 hover:text-white' 
+                  : 'bg-slate-100 hover:bg-red-50 border-slate-200 hover:border-red-200 text-slate-600 hover:text-[#CE1126]'
+              }`}
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+          </ActionTooltip>
           <div>
             <h1 className="text-xl md:text-2xl font-black flex items-center gap-2">
               <Navigation className="w-6 h-6 text-[#CE1126]" />
               Miotso Campus Live Navigator
             </h1>
             <p className={`text-xs font-semibold ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-              Google Satellite & Roads • Neon Red Road Tracker • Real OpenStreetMap Routing
+              Google Satellite & Roads • Campus Landmarks & Live Directory
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+        {/* Streamlined Minimalist Horizontal Action Bar */}
+        <div className="flex items-center gap-2 sm:gap-2.5 overflow-x-auto no-scrollbar py-1 px-1 -mx-1 max-w-full justify-start lg:justify-end">
           {/* Theme Toggle */}
-          <ThemeToggle />
+          <ActionTooltip label={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}>
+            <ThemeToggle className="w-10 h-10 lg:w-11 lg:h-11 min-w-[40px] min-h-[40px] lg:min-w-[44px] lg:min-h-[44px] flex items-center justify-center p-0 shrink-0" />
+          </ActionTooltip>
 
-          {/* CLEAR ROAD VIEW TOGGLE (Seamlessly clears labels from map interface) */}
-          <button
-            onClick={() => {
-              setIsCleanRoadView(!isCleanRoadView);
-              setGpsMessage(
-                !isCleanRoadView 
-                  ? '🛡️ Clear Road View Active: Labels docked away, asphalt & lanes 100% visible' 
-                  : '🏷️ Full Labels Active: Landmark badges visible on map'
-              );
-            }}
-            id="toggle-clean-road-view-btn"
-            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-full font-bold text-xs transition-all cursor-pointer border ${
-              isCleanRoadView
-                ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-500 shadow-sm'
-                : isDark
-                  ? 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
-                  : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200'
-            }`}
-            title="Toggle Clean Road View: Clears bulky labels away to keep road lanes unobstructed"
-          >
-            <Eye className="w-3.5 h-3.5" />
-            <span>{isCleanRoadView ? 'Clear Road View' : 'Show All Labels'}</span>
-          </button>
-
-          {/* OSM & PLACES JSON CODE TRIGGER BUTTON */}
-          <button
-            onClick={() => setShowOsmInspector(true)}
-            id="open-osm-json-inspector-btn"
-            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-full font-bold text-xs transition-all cursor-pointer border ${
-              showOsmInspector
-                ? 'bg-[#CE1126] text-white border-[#CE1126]'
-                : isDark
-                  ? 'bg-slate-800 hover:bg-slate-700 text-amber-300 border-slate-700'
-                  : 'bg-amber-50 hover:bg-amber-100 text-amber-900 border-amber-200'
-            }`}
-            title="Render JSON code of OSM and open-source places API with map focus trigger"
-          >
-            <Code className="w-3.5 h-3.5 text-amber-400" />
-            <span>OSM Places JSON</span>
-          </button>
-
-          {/* Map Tile Switcher */}
-          <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-full border border-slate-200 dark:border-slate-700 text-xs font-bold overflow-x-auto">
+          {/* CLEAR ROAD VIEW TOGGLE (Pure Icon Symbol + Tooltip) */}
+          <ActionTooltip label={isCleanRoadView ? 'Clear Road View Active: Labels docked away' : 'Toggle Clear Road View: Dock labels away'}>
             <button
               onClick={() => {
-                setActiveTileKey('google_hybrid');
-                setGpsMessage('📍 Google Hybrid Active: High-Res Satellite + Roads + Place Labels');
+                setIsCleanRoadView(!isCleanRoadView);
+                setGpsMessage(
+                  !isCleanRoadView 
+                    ? '🛡️ Clear Road View Active: Labels docked away, asphalt & lanes 100% visible' 
+                    : '🏷️ Full Labels Active: Landmark badges visible on map'
+                );
               }}
-              className={`px-3 py-1.5 rounded-full transition-all cursor-pointer whitespace-nowrap ${
-                activeTileKey === 'google_hybrid'
-                  ? 'bg-[#CE1126] text-white shadow-sm'
-                  : 'text-slate-600 dark:text-slate-300 hover:text-[#CE1126]'
+              id="toggle-clean-road-view-btn"
+              aria-label={isCleanRoadView ? 'Clear Road View Active' : 'Toggle Clear Road View'}
+              className={`w-10 h-10 lg:w-11 lg:h-11 min-w-[40px] min-h-[40px] lg:min-w-[44px] lg:min-h-[44px] rounded-full flex items-center justify-center transition-all cursor-pointer border hover:scale-105 active:scale-95 shrink-0 ${
+                isCleanRoadView
+                  ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-500 shadow-md shadow-emerald-500/20'
+                  : isDark
+                    ? 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
+                    : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200'
               }`}
-              title="Google Hybrid (Satellite + Roads & Labels)"
             >
-              🛰️ Hybrid
+              {isCleanRoadView ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
             </button>
-            <button
-              onClick={() => {
-                setActiveTileKey('google_streets');
-                setGpsMessage('📍 Google Roads Active: Clear Streets, Campus Pathways & Lanes');
-              }}
-              className={`px-3 py-1.5 rounded-full transition-all cursor-pointer whitespace-nowrap ${
-                activeTileKey === 'google_streets'
-                  ? 'bg-[#CE1126] text-white shadow-sm'
-                  : 'text-slate-600 dark:text-slate-300 hover:text-[#CE1126]'
-              }`}
-              title="Google Roads (Clear Streets & Lanes)"
-            >
-              🛣️ Roads
-            </button>
-            <button
-              onClick={() => {
-                setActiveTileKey('osm_standard');
-                setGpsMessage('📍 OpenStreetMap Active: Standard Open-Source Vector Map');
-              }}
-              className={`px-3 py-1.5 rounded-full transition-all cursor-pointer whitespace-nowrap ${
-                activeTileKey === 'osm_standard'
-                  ? 'bg-[#CE1126] text-white shadow-sm'
-                  : 'text-slate-600 dark:text-slate-300 hover:text-[#CE1126]'
-              }`}
-              title="OpenStreetMap Standard Vector"
-            >
-              🗺️ OSM
-            </button>
+          </ActionTooltip>
+
+          {/* Map Tile Switcher (Pure Emoji Symbols + Tooltips) */}
+          <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800/90 p-1 rounded-full border border-slate-200 dark:border-slate-700 shrink-0">
+            <ActionTooltip label="Google Hybrid (Satellite + Roads & Labels)">
+              <button
+                onClick={() => {
+                  setActiveTileKey('google_hybrid');
+                  setGpsMessage('📍 Google Hybrid Active: High-Res Satellite + Roads + Place Labels');
+                }}
+                aria-label="Google Hybrid Satellite"
+                className={`w-9 h-9 sm:w-10 sm:h-10 min-w-[36px] sm:min-w-[40px] rounded-full flex items-center justify-center text-base sm:text-lg transition-all cursor-pointer ${
+                  activeTileKey === 'google_hybrid'
+                    ? 'bg-[#CE1126] text-white shadow-sm scale-105'
+                    : 'hover:bg-slate-200 dark:hover:bg-slate-700 opacity-70 hover:opacity-100'
+                }`}
+              >
+                🛰️
+              </button>
+            </ActionTooltip>
+
+            <ActionTooltip label="Google Streets (Clear Pathways & Roads)">
+              <button
+                onClick={() => {
+                  setActiveTileKey('google_streets');
+                  setGpsMessage('📍 Google Streets Active: Clear Streets & Campus Pathways');
+                }}
+                aria-label="Google Streets"
+                className={`w-9 h-9 sm:w-10 sm:h-10 min-w-[36px] sm:min-w-[40px] rounded-full flex items-center justify-center text-base sm:text-lg transition-all cursor-pointer ${
+                  activeTileKey === 'google_streets'
+                    ? 'bg-[#CE1126] text-white shadow-sm scale-105'
+                    : 'hover:bg-slate-200 dark:hover:bg-slate-700 opacity-70 hover:opacity-100'
+                }`}
+              >
+                🛣️
+              </button>
+            </ActionTooltip>
+
+            <ActionTooltip label="Standard Vector Map">
+              <button
+                onClick={() => {
+                  setActiveTileKey('osm_standard');
+                  setGpsMessage('📍 Vector Map Active: Standard Vector Map View');
+                }}
+                aria-label="Standard Vector Map"
+                className={`w-9 h-9 sm:w-10 sm:h-10 min-w-[36px] sm:min-w-[40px] rounded-full flex items-center justify-center text-base sm:text-lg transition-all cursor-pointer ${
+                  activeTileKey === 'osm_standard'
+                    ? 'bg-[#CE1126] text-white shadow-sm scale-105'
+                    : 'hover:bg-slate-200 dark:hover:bg-slate-700 opacity-70 hover:opacity-100'
+                }`}
+              >
+                🗺️
+              </button>
+            </ActionTooltip>
           </div>
 
-          {/* Center on You */}
-          <button
-            onClick={() => {
-              if (mapInstanceRef.current && userLivePos) {
-                mapInstanceRef.current.setView([userLivePos.lat, userLivePos.lng], 17, { animate: true });
-                setGpsMessage(`📍 Map centered on 'You are here'`);
-              }
-            }}
-            id="locate-me-button"
-            className="flex items-center gap-1.5 bg-[#CE1126] hover:bg-[#A00D1D] text-white font-extrabold text-xs px-3.5 py-2 rounded-full shadow-md shadow-red-500/20 transition-all cursor-pointer"
-            title="Center view on your GPS location"
-          >
-            <Crosshair className="w-3.5 h-3.5" />
-            <span>Center You</span>
-          </button>
+          {/* Center on You (Pure Icon Symbol + Tooltip) */}
+          <ActionTooltip label="Center on You (GPS Location)">
+            <button
+              onClick={() => {
+                if (mapInstanceRef.current && userLivePos) {
+                  mapInstanceRef.current.setView([userLivePos.lat, userLivePos.lng], 17, { animate: true });
+                  setGpsMessage(`📍 Map centered on 'You are here'`);
+                }
+              }}
+              id="locate-me-button"
+              aria-label="Center view on your GPS location"
+              className="w-10 h-10 lg:w-11 lg:h-11 min-w-[40px] min-h-[40px] lg:min-w-[44px] lg:min-h-[44px] rounded-full flex items-center justify-center bg-[#CE1126] hover:bg-[#A00D1D] text-white shadow-md shadow-red-500/20 transition-all cursor-pointer hover:scale-105 active:scale-95 shrink-0"
+            >
+              <Crosshair className="w-5 h-5 text-white" />
+            </button>
+          </ActionTooltip>
         </div>
       </div>
 
@@ -1012,294 +925,17 @@ export const GPSView: React.FC<GPSViewProps> = ({ onBackToDashboard, initialSear
 
       {/* Main Grid: Left Navigation Control Panel & Right Leaflet Map Canvas */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-1">
-        {/* LEFT PANEL */}
+        {/* LEFT PANEL: CAMPUS DIRECTORY & LANDMARKS */}
         <div className="space-y-5">
-          
-          {/* 🧭 TURN-BY-TURN ROAD NAVIGATOR WITH START & DESTINATION LISTS */}
-          <div className={`p-5 rounded-3xl shadow-xl border ${
-            isDark 
-              ? 'bg-slate-900/90 border-slate-800 shadow-black/50' 
-              : 'bg-white border-red-100 shadow-red-100/50'
-          }`}>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className={`text-base font-black flex items-center gap-2 ${
-                isDark ? 'text-white' : 'text-slate-900'
-              }`}>
-                <Compass className="w-5 h-5 text-[#CE1126]" />
-                Roads & Lanes Campus Navigator
-              </h2>
-              <button
-                onClick={handleSwapRoute}
-                className="p-1.5 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer border border-slate-200 dark:border-slate-700"
-                title="Swap Start and Destination"
-              >
-                <ArrowUpDown className="w-4 h-4 text-[#CE1126]" />
-              </button>
-            </div>
-
-            {/* Quick Preset Journey Chips */}
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-2 mb-3 scrollbar-none">
-              <button
-                onClick={() => {
-                  setStartType('gps');
-                  setDestBuildingId('clinic-1');
-                  setIsNavigating(true);
-                }}
-                className="px-2.5 py-1 rounded-full bg-red-100 dark:bg-red-950/80 text-[#CE1126] dark:text-red-300 text-[10px] font-extrabold whitespace-nowrap cursor-pointer hover:bg-red-200"
-              >
-                📍 GPS → 🏥 Clinic
-              </button>
-              <button
-                onClick={() => {
-                  setStartType('gps');
-                  setDestBuildingId('food-court');
-                  setIsNavigating(true);
-                }}
-                className="px-2.5 py-1 rounded-full bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300 text-[10px] font-extrabold whitespace-nowrap cursor-pointer hover:bg-amber-200"
-              >
-                📍 GPS → ☕ Food Court
-              </button>
-              <button
-                onClick={() => {
-                  setStartType('building');
-                  setStartBuildingId('main-gate');
-                  setDestBuildingId('library-main');
-                  setIsNavigating(true);
-                }}
-                className="px-2.5 py-1 rounded-full bg-blue-100 dark:bg-blue-950/80 text-blue-800 dark:text-blue-300 text-[10px] font-extrabold whitespace-nowrap cursor-pointer hover:bg-blue-200"
-              >
-                🚪 Gate → 📚 Library
-              </button>
-            </div>
-
-            {/* START LOCATION SELECTOR LIST */}
-            <div className="space-y-3 mb-4">
-              <div>
-                <label className={`block text-xs font-bold mb-1 flex items-center justify-between ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
-                  <span>Start Location</span>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setStartType('gps')}
-                      className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full cursor-pointer ${
-                        startType === 'gps'
-                          ? 'bg-emerald-600 text-white'
-                          : 'text-slate-400 hover:text-slate-200'
-                      }`}
-                    >
-                      Use My GPS
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setStartType('building')}
-                      className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full cursor-pointer ${
-                        startType === 'building'
-                          ? 'bg-[#CE1126] text-white'
-                          : 'text-slate-400 hover:text-slate-200'
-                      }`}
-                    >
-                      Pick Landmark
-                    </button>
-                  </div>
-                </label>
-
-                {startType === 'gps' ? (
-                  <div className={`p-3 rounded-2xl border flex items-center justify-between ${
-                    isDark ? 'bg-slate-800/80 border-slate-700' : 'bg-emerald-50/80 border-emerald-200'
-                  }`}>
-                    <div className="flex items-center gap-2">
-                      <div className="w-7 h-7 rounded-lg bg-emerald-600 text-white flex items-center justify-center font-bold text-xs">
-                        📍
-                      </div>
-                      <div>
-                        <div className="text-xs font-black text-emerald-600 dark:text-emerald-400">
-                          My Live GPS Location
-                        </div>
-                        <div className="text-[10px] text-slate-400 font-mono">
-                          Near {detectedBuilding?.name.split(' (')[0] || 'Miotso'} ({distanceToBuilding}m away)
-                        </div>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => runAutoBuildingDetection()}
-                      className="text-xs text-slate-400 hover:text-emerald-500 cursor-pointer"
-                      title="Refresh GPS"
-                    >
-                      <RefreshCw className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                ) : (
-                  <select
-                    value={startBuildingId}
-                    onChange={(e) => setStartBuildingId(e.target.value)}
-                    className={`w-full px-3 py-2 rounded-xl text-xs font-medium transition-colors focus:outline-none focus:border-[#CE1126] border ${
-                      isDark 
-                        ? 'bg-slate-800 border-slate-700 text-white' 
-                        : 'bg-slate-50 border-slate-200 text-slate-900 focus:bg-white'
-                    }`}
-                  >
-                    <optgroup label="Campus Gates & Hubs">
-                      <option value="main-gate">🚪 Central University Main Gate (Accra-Aflao Rd)</option>
-                      <option value="senate-1">🏢 Senate & Administration Block</option>
-                      <option value="sports-complex">⚽ Sports Complex & Stadium</option>
-                    </optgroup>
-                    <optgroup label="Residential Hostels">
-                      <option value="trinity-hall">🛏️ Trinity Hall (Male Hostel)</option>
-                      <option value="destiny-hall">🛏️ Destiny Hall (Female Hostel)</option>
-                    </optgroup>
-                    <optgroup label="Academic & Faculties">
-                      <option value="business-school">🎓 Central Business School (CBS)</option>
-                      <option value="law-faculty">⚖️ Faculty of Law & Great Hall</option>
-                      <option value="engineering-block">📐 School of Architecture & Engineering</option>
-                      <option value="library-main">📚 Central University Main Library</option>
-                    </optgroup>
-                    <optgroup label="Medical & Amenities">
-                      <option value="clinic-1">🏥 Central University Clinic</option>
-                      <option value="food-court">🍽️ Miotso Cafeteria & Food Court</option>
-                    </optgroup>
-                  </select>
-                )}
-              </div>
-
-              {/* DESTINATION LOCATION SELECTOR LIST */}
-              <div>
-                <label className={`block text-xs font-bold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
-                  Destination Location
-                </label>
-                <select
-                  value={destBuildingId}
-                  onChange={(e) => setDestBuildingId(e.target.value)}
-                  className={`w-full px-3 py-2 rounded-xl text-xs font-medium transition-colors focus:outline-none focus:border-[#CE1126] border ${
-                    isDark 
-                      ? 'bg-slate-800 border-slate-700 text-white' 
-                      : 'bg-slate-50 border-slate-200 text-slate-900 focus:bg-white'
-                  }`}
-                >
-                  <optgroup label="Medical & Urgent Care">
-                    <option value="clinic-1">🏥 Central University Clinic (Emergency Triage)</option>
-                  </optgroup>
-                  <optgroup label="Dining & Amenities">
-                    <option value="food-court">🍽️ Miotso Cafeteria & Food Court</option>
-                  </optgroup>
-                  <optgroup label="Academic & Faculties">
-                    <option value="library-main">📚 Central University Main Library</option>
-                    <option value="business-school">🎓 Central Business School (CBS)</option>
-                    <option value="law-faculty">⚖️ Faculty of Law & Great Hall</option>
-                    <option value="engineering-block">📐 School of Architecture & Engineering</option>
-                    <option value="senate-1">🏢 Senate & Administration Block</option>
-                  </optgroup>
-                  <optgroup label="Hostels & Residences">
-                    <option value="trinity-hall">🛏️ Trinity Hall (Male Hostel)</option>
-                    <option value="destiny-hall">🛏️ Destiny Hall (Female Hostel)</option>
-                  </optgroup>
-                  <optgroup label="Gates & Transit">
-                    <option value="main-gate">🚪 Main Campus Gate (Accra-Aflao Rd)</option>
-                    <option value="sports-complex">⚽ Sports Complex & Stadium</option>
-                  </optgroup>
-                </select>
-              </div>
-            </div>
-
-            {/* ACTION BUTTONS: Find Route & Start Neon Navigation */}
-            <div className="space-y-2">
-              <button
-                onClick={() => {
-                  setIsNavigating(!isNavigating);
-                  if (!isLiveGpsActive && !isNavigating) setIsLiveGpsActive(true);
-                }}
-                id="toggle-navigation-button"
-                className={`w-full py-3 font-extrabold text-xs rounded-full shadow-md transition-all cursor-pointer ${
-                  isNavigating
-                    ? isDark
-                      ? 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700'
-                      : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300'
-                    : 'bg-[#CE1126] hover:bg-[#A00D1D] text-white shadow-red-500/20'
-                }`}
-              >
-                {isLoadingRoute ? 'Calculating Road & Lane Path...' : isNavigating ? 'Clear Active Route' : 'Find Best Route & Directions'}
-              </button>
-
-              {isNavigating && routeData && (
-                <button
-                  onClick={() => setIsNeonNavigating(!isNeonNavigating)}
-                  id="start-neon-tracker-button"
-                  className={`w-full py-2.5 font-black text-xs rounded-full border transition-all cursor-pointer flex items-center justify-center gap-2 shadow-lg ${
-                    isNeonNavigating
-                      ? 'bg-amber-500 text-slate-950 border-amber-400 animate-pulse'
-                      : 'bg-gradient-to-r from-[#ff003b] to-[#dc2626] text-white border-red-500 shadow-red-600/30'
-                  }`}
-                >
-                  <Flame className="w-4 h-4 text-white" />
-                  <span>{isNeonNavigating ? 'Pause Neon Tracker Navigation' : '⚡ Start Neon Red Maps Tracker'}</span>
-                </button>
-              )}
-            </div>
-
-            {/* Calculated Route Details & Live Guidance */}
-            {isNavigating && routeData && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                className={`mt-4 pt-4 border-t space-y-3 ${isDark ? 'border-slate-800' : 'border-slate-100'}`}
-              >
-                <div className="grid grid-cols-2 gap-2 text-center">
-                  <div className={`p-2.5 rounded-xl border ${
-                    isDark ? 'bg-slate-800/60 border-slate-700' : 'bg-slate-50 border-slate-200'
-                  }`}>
-                    <span className="block text-[10px] font-bold text-slate-400">Road Distance</span>
-                    <span className={`text-base font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                      {telemetry.remainingMeters > 0 ? telemetry.remainingMeters : routeData.distanceMeters} m
-                    </span>
-                  </div>
-                  <div className={`p-2.5 rounded-xl border ${
-                    isDark ? 'bg-slate-800/60 border-slate-700' : 'bg-slate-50 border-slate-200'
-                  }`}>
-                    <span className="block text-[10px] font-bold text-slate-400">Est. Walk Time</span>
-                    <span className="text-base font-black text-[#CE1126]">{telemetry.etaMins || routeData.walkMinutes} min</span>
-                  </div>
-                </div>
-
-                <div className={`p-2.5 rounded-xl border text-[11px] ${
-                  isDark ? 'bg-slate-800/40 border-slate-700 text-slate-300' : 'bg-slate-50 border-slate-200 text-slate-700'
-                }`}>
-                  <div className="font-black text-amber-500 mb-0.5">Primary Campus Road:</div>
-                  <div className="font-bold">{routeData.primaryRoad}</div>
-                  <div className="text-[10px] text-slate-400 mt-0.5">{routeData.roadSurface}</div>
-                </div>
-
-                {/* Turn Guidance */}
-                <div className="space-y-2">
-                  <h4 className={`text-xs font-bold flex items-center justify-between ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                    <span className="flex items-center gap-1.5">
-                      <Clock className="w-3.5 h-3.5 text-[#CE1126]" />
-                      Turn-by-Turn Road Guidance:
-                    </span>
-                    <span className="text-[9px] font-black bg-red-500/20 text-[#ff003b] px-2 py-0.5 rounded-full border border-red-500/30">
-                      Neon OSRM Router
-                    </span>
-                  </h4>
-                  <ol className={`text-xs space-y-1.5 list-decimal list-inside p-3 rounded-2xl border ${
-                    isDark ? 'bg-slate-800/60 border-slate-700 text-slate-300' : 'bg-slate-50 border-slate-200 text-slate-600'
-                  }`}>
-                    {routeData.steps.map((step, idx) => (
-                      <li key={idx} className={`leading-snug ${activeStepIndex === idx ? 'font-bold text-[#ff003b] dark:text-red-400' : ''}`}>
-                        {step}
-                      </li>
-                    ))}
-                  </ol>
-                </div>
-              </motion.div>
-            )}
-          </div>
-
           {/* CAMPUS DIRECTORY SEARCH */}
-          <div className={`p-5 rounded-3xl shadow-xl border space-y-3 ${
+          <div className={`p-5 rounded-3xl shadow-xl border flex flex-col h-full min-h-[580px] space-y-3 ${
             isDark 
               ? 'bg-slate-900/90 border-slate-800 shadow-black/50' 
               : 'bg-white border-red-100 shadow-red-100/50'
           }`}>
             <div className="flex items-center justify-between">
-              <span className={`text-xs font-bold ${isDark ? 'text-slate-300' : 'text-slate-800'}`}>
+              <span className={`text-sm font-extrabold flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-800'}`}>
+                <BuildingIcon className="w-4 h-4 text-[#CE1126]" />
                 Campus Directory
               </span>
               {trimmedSearch && (
@@ -1350,7 +986,7 @@ export const GPSView: React.FC<GPSViewProps> = ({ onBackToDashboard, initialSear
               ))}
             </div>
 
-            <div className="max-h-52 overflow-y-auto space-y-2 pr-1">
+            <div className="flex-1 overflow-y-auto space-y-2 pr-1 min-h-[380px] max-h-[500px]">
               {filteredBuildings.length === 0 ? (
                 <div className="text-center py-6 text-slate-400 text-xs font-medium">
                   No campus building matching "{searchQuery}"
@@ -1552,178 +1188,6 @@ export const GPSView: React.FC<GPSViewProps> = ({ onBackToDashboard, initialSear
         </div>
       </div>
 
-      {/* 🚀 OSM & OPEN-SOURCE PLACES GEOJSON CODE INSPECTOR & MAP FOCUS MODAL */}
-      <AnimatePresence>
-        {showOsmInspector && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
-            <motion.div
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              className={`w-full max-w-4xl max-h-[88vh] rounded-3xl p-6 shadow-2xl relative border flex flex-col ${
-                isDark 
-                  ? 'bg-slate-900 border-slate-800 text-slate-100 shadow-black/90' 
-                  : 'bg-white border-red-100 text-slate-800'
-              }`}
-            >
-              <div className="flex items-center justify-between pb-4 border-b border-slate-700/50">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-2xl bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold text-lg border border-amber-500/30">
-                    <Code className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h3 className="text-base font-black flex items-center gap-2">
-                      OpenStreetMap (OSM) & Places GeoJSON Code Engine
-                    </h3>
-                    <p className="text-xs text-slate-400">
-                      Targeted road labels & lane features with interactive Leaflet map focus triggers
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => {
-                      navigator.clipboard.writeText(JSON.stringify(CAMPUS_OSM_DATASET, null, 2));
-                      setCopiedJson(true);
-                      setTimeout(() => setCopiedJson(false), 2000);
-                    }}
-                    className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition-colors cursor-pointer border border-slate-700"
-                    title="Copy GeoJSON"
-                  >
-                    {copiedJson ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                    <span>{copiedJson ? 'Copied!' : 'Copy JSON'}</span>
-                  </button>
-
-                  <button
-                    onClick={() => setShowOsmInspector(false)}
-                    className="p-2 rounded-full hover:bg-slate-800 text-slate-400 hover:text-white cursor-pointer"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
-                </div>
-              </div>
-
-              {/* Filter Tabs & Overpass Live Query Button */}
-              <div className="flex flex-wrap items-center justify-between gap-2 py-3 border-b border-slate-700/50 text-xs">
-                <div className="flex items-center gap-1.5">
-                  <button
-                    onClick={() => setOsmFilter('all')}
-                    className={`px-3 py-1 rounded-full font-bold transition-all cursor-pointer ${
-                      osmFilter === 'all' ? 'bg-[#CE1126] text-white' : 'text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    All Features ({CAMPUS_OSM_DATASET.features.length})
-                  </button>
-                  <button
-                    onClick={() => setOsmFilter('roads')}
-                    className={`px-3 py-1 rounded-full font-bold transition-all cursor-pointer ${
-                      osmFilter === 'roads' ? 'bg-[#CE1126] text-white' : 'text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    🛣️ Roads & Lanes (8)
-                  </button>
-                  <button
-                    onClick={() => setOsmFilter('amenities')}
-                    className={`px-3 py-1 rounded-full font-bold transition-all cursor-pointer ${
-                      osmFilter === 'amenities' ? 'bg-[#CE1126] text-white' : 'text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    🍽️ Food & Amenities (4)
-                  </button>
-                  <button
-                    onClick={() => setOsmFilter('buildings')}
-                    className={`px-3 py-1 rounded-full font-bold transition-all cursor-pointer ${
-                      osmFilter === 'buildings' ? 'bg-[#CE1126] text-white' : 'text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    🏛️ Campus Facilities (7)
-                  </button>
-                </div>
-
-                {/* Overpass Live API query */}
-                <button
-                  onClick={async () => {
-                    setIsQueryingOverpass(true);
-                    try {
-                      const res = await fetch('/api/gps/osm-features?liveOverpass=true');
-                      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                      const ct = res.headers.get('content-type') || '';
-                      if (!ct.includes('application/json')) throw new Error('Expected JSON');
-                      const data = await res.json();
-                      if (data.success) {
-                        setOverpassStats(`Live Overpass elements queried successfully from OSM servers!`);
-                      }
-                    } catch (e) {
-                      setOverpassStats('Overpass query routed via cached dataset.');
-                    } finally {
-                      setIsQueryingOverpass(false);
-                    }
-                  }}
-                  disabled={isQueryingOverpass}
-                  className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-extrabold cursor-pointer hover:bg-emerald-500/30"
-                >
-                  <RefreshCw className={`w-3 h-3 ${isQueryingOverpass ? 'animate-spin' : ''}`} />
-                  <span>{isQueryingOverpass ? 'Querying Overpass...' : 'Query Live Overpass API'}</span>
-                </button>
-              </div>
-
-              {overpassStats && (
-                <div className="py-2 text-[11px] font-bold text-emerald-400">
-                  {overpassStats}
-                </div>
-              )}
-
-              {/* JSON Features Code List with Direct Map Focus Triggers */}
-              <div className="flex-1 overflow-y-auto space-y-3 py-3 pr-2 scrollbar-thin font-mono text-xs">
-                {filteredOsmFeatures.map((f) => {
-                  const isRoad = f.geometry.type === 'LineString';
-                  return (
-                    <div
-                      key={f.id}
-                      className={`p-3.5 rounded-2xl border transition-all ${
-                        isDark ? 'bg-slate-950/80 border-slate-800' : 'bg-slate-50 border-slate-200'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between gap-3 mb-2">
-                        <div className="flex items-center gap-2">
-                          <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-md ${
-                            isRoad ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
-                          }`}>
-                            {isRoad ? '🛣️ WAY / ROAD' : '📍 NODE / PLACE'}
-                          </span>
-                          <span className="font-bold text-sm text-white font-sans">
-                            {f.properties.name}
-                          </span>
-                        </div>
-
-                        {/* 🎯 TRIGGER MAP FOCUS BUTTON */}
-                        <button
-                          onClick={() => {
-                            triggerMapFocusOnFeature(f);
-                            setShowOsmInspector(false);
-                          }}
-                          className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-[#ff003b] hover:bg-[#d00030] text-white font-sans text-xs font-black transition-all cursor-pointer shadow-md shadow-red-600/30"
-                          title="Trigger camera to zoom & highlight this targeted road or place"
-                        >
-                          <Crosshair className="w-3.5 h-3.5" />
-                          <span>🎯 Trigger Map Focus</span>
-                        </button>
-                      </div>
-
-                      {/* Syntax Highlighted JSON Code Preview */}
-                      <pre className="p-2.5 rounded-xl bg-slate-900 text-slate-300 text-[11px] overflow-x-auto border border-slate-800">
-{JSON.stringify(f, null, 2)}
-                      </pre>
-                    </div>
-                  );
-                })}
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
       {/* BUILDING DETAILS DRAWER / MODAL */}
       <AnimatePresence>
         {activeBuilding && (
@@ -1781,16 +1245,16 @@ export const GPSView: React.FC<GPSViewProps> = ({ onBackToDashboard, initialSear
               <div className="flex flex-wrap gap-2">
                 <button
                   onClick={() => {
-                    setStartType('building');
-                    setStartBuildingId(activeBuilding.id);
-                    setIsNavigating(true);
+                    if (mapInstanceRef.current) {
+                      mapInstanceRef.current.setView([activeBuilding.lat, activeBuilding.lng], 18, { animate: true });
+                    }
                     setActiveBuilding(null);
                   }}
-                  id={`set-start-${activeBuilding.id}`}
-                  className="flex-1 py-3 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs rounded-full shadow-md cursor-pointer flex items-center justify-center gap-1.5"
+                  id={`center-landmark-${activeBuilding.id}`}
+                  className="flex-1 py-3 bg-[#002147] hover:bg-[#001835] text-white font-black text-xs rounded-full shadow-md cursor-pointer flex items-center justify-center gap-1.5"
                 >
                   <MapPin className="w-4 h-4" />
-                  <span>Set as Start</span>
+                  <span>Center on Map</span>
                 </button>
 
                 <button

@@ -14,10 +14,32 @@ interface UserAccount {
   phone?: string;
   studentId?: string;
   avatar?: string;
+  gender?: 'male' | 'female' | 'other';
   createdAt: string;
 }
 
 const users: Map<string, UserAccount> = new Map();
+
+function detectGenderFromName(name: string): 'male' | 'female' {
+  if (!name) return 'male';
+  const firstName = name.trim().split(/\s+/)[0].toLowerCase();
+  const femaleNames = [
+    'mary', 'patricia', 'linda', 'barbara', 'elizabeth', 'jennifer', 'maria', 'susan', 'margaret', 'dorothy',
+    'lisa', 'nancy', 'karen', 'betty', 'helen', 'sandra', 'donna', 'carol', 'ruth', 'sharon', 'michelle',
+    'laura', 'sarah', 'kim', 'deborah', 'jessica', 'shirley', 'cynthia', 'angela', 'melissa', 'brenda', 'amy',
+    'anna', 'rebecca', 'virginia', 'kathleen', 'pamela', 'martha', 'debra', 'amanda', 'stephanie', 'carolyn',
+    'christine', 'marie', 'janet', 'catherine', 'frances', 'ann', 'joyce', 'diane', 'alice', 'julie', 'heather',
+    'teresa', 'doris', 'gloria', 'evelyn', 'jean', 'cheryl', 'mildred', 'katherine', 'joan', 'ashley', 'judith',
+    'rose', 'janice', 'kelly', 'nicole', 'judy', 'christina', 'kathy', 'theresa', 'beverly', 'denise', 'tammy',
+    'irene', 'jane', 'lori', 'rachel', 'marilyn', 'andrea', 'kathryn', 'louise', 'sara', 'anne', 'jacqueline',
+    'wanda', 'bonnie', 'julia', 'ruby', 'lois', 'tina', 'phyllis', 'norma', 'paula', 'diana', 'annie', 'lillian',
+    'emily', 'hannah', 'akosua', 'abena', 'yaa', 'afia', 'adwoa', 'amma', 'esi', 'priscilla', 'gifty', 'prudence',
+    'beatrice', 'abigail', 'dorcas', 'esther', 'mercy', 'joanna', 'jessica', 'rachel', 'favour', 'blessing', 'cynthia',
+    'grace', 'faith', 'hope', 'destiny', 'charity', 'joy', 'peace', 'victory', 'queen', 'princes', 'princess'
+  ];
+  return femaleNames.includes(firstName) ? 'female' : 'male';
+}
+
 
 // -------------------------------------------------------------
 // OPENROUTER AI CONFIGURATION & HELPER
@@ -256,6 +278,14 @@ async function startServer() {
   // High limit body parsers to support user image uploads, avatars, and product photos
   app.use(express.json({ limit: '50mb' }));
   app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+
+  // Anti-caching headers for real-time live preview updates
+  app.use((_req, res, next) => {
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
+    next();
+  });
 
   // Global Error Handler for Payload Too Large & Malformed JSON
   app.use((err: any, _req: express.Request, res: express.Response, next: express.NextFunction) => {
@@ -690,7 +720,7 @@ async function startServer() {
 
   // User Sign-up: Registers a new user account
   app.post('/api/auth/register', (req, res) => {
-    const { name, email, password, role, phone, studentId, avatar } = req.body || {};
+    const { name, email, password, role, phone, studentId, avatar, gender } = req.body || {};
     if (!email || !password) {
       return res.status(400).json({ success: false, message: 'Email and password are required.' });
     }
@@ -702,20 +732,33 @@ async function startServer() {
       });
     }
 
+    const derivedName = name?.trim() || normalizedEmail.split('@')[0];
+    const finalGender = gender || detectGenderFromName(derivedName);
+
+    let finalAvatar = avatar;
+    if (!finalAvatar) {
+      if (finalGender === 'female') {
+        finalAvatar = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=300';
+      } else {
+        finalAvatar = 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&q=80&w=300';
+      }
+    }
+
     const newUser: UserAccount = {
       id: `user_${Date.now()}`,
-      name: (name?.trim() || normalizedEmail.split('@')[0]),
+      name: derivedName,
       email: normalizedEmail,
       password: String(password).trim(),
       role: role || 'student',
       phone: phone ? String(phone).trim() : undefined,
       studentId: studentId ? String(studentId).trim() : undefined,
-      avatar: avatar || undefined,
+      avatar: finalAvatar,
+      gender: finalGender,
       createdAt: new Date().toISOString(),
     };
 
     users.set(normalizedEmail, newUser);
-    console.log(`[AUTH] New user registered: ${normalizedEmail}`);
+    console.log(`[AUTH] New user registered: ${normalizedEmail} (Gender: ${gender || 'none'})`);
 
     return res.status(201).json({
       success: true,
@@ -728,6 +771,7 @@ async function startServer() {
         phone: newUser.phone,
         studentId: newUser.studentId,
         avatar: newUser.avatar,
+        gender: newUser.gender,
       }
     });
   });
@@ -774,6 +818,7 @@ async function startServer() {
         phone: existingUser.phone,
         studentId: existingUser.studentId,
         avatar: existingUser.avatar,
+        gender: existingUser.gender,
       }
     });
   });
@@ -788,113 +833,8 @@ async function startServer() {
     return res.json({ exists });
   });
 
-  // Official Central University Ghana Notices & Web Updates Data (central.edu.gh)
-  const CAMPUS_NOTICES = [
-    {
-      id: "notice-1",
-      title: "2026/2027 Admissions Open for Undergraduate, Law, Nursing & Postgraduate",
-      summary: "Official applications are now open for all accredited degree, diploma, and postgraduate programmes across Miotso and Kumasi campuses.",
-      content: "Central University invites qualified prospective students to apply for admission into the 2026/2027 Academic Year. Programmes offered include BSc. Nursing, Midwifery, LLB Law, BSc. Computer Science, Civil Engineering, Pharmacy, and MBA programmes. Both regular and weekend/sandwich streams are available. Submit applications online via the official portal.",
-      category: "Admissions",
-      date: "Aug 13, 2026",
-      officialLink: "http://central.edu.gh/admissions/",
-      priority: "urgent",
-      source: "Directorate of Academic Affairs & Admissions",
-      targetAudience: "Prospective & Transfer Candidates",
-      isNew: true
-    },
-    {
-      id: "notice-2",
-      title: "Second Semester Course Registration & Fee Clearance Deadline",
-      summary: "Mandatory notice for continuing undergraduate & postgraduate students regarding semester registration deadlines and exam dockets.",
-      content: "The Academic Affairs Directorate informs all students that the online registration portal for Semester 2 courses will close on Friday at 5:00 PM. Students who have attained the minimum 70% tuition fee clearance are advised to print their official examination dockets ahead of mid-semester assessments.",
-      category: "Academic",
-      date: "Aug 12, 2026",
-      officialLink: "http://central.edu.gh/academic-calendar/",
-      priority: "urgent",
-      source: "Office of the Registrar",
-      targetAudience: "All Continuing Students",
-      isNew: true
-    },
-    {
-      id: "notice-3",
-      title: "25th Congregation & Matriculation Ceremony Announcement",
-      summary: "Official communiqué regarding the upcoming 25th Congregation for graduating class and Matriculation of fresh students.",
-      content: "The Office of the Vice-Chancellor cordially announces the 25th Congregation Ceremony scheduled to hold at the Miotso Main Campus Quadrangle. Graduands who have completed all clearance requirements can pick up academic gowns from the Senate Building. Live broadcast will be streamed on Central University YouTube and Facebook.",
-      category: "Events",
-      date: "Aug 10, 2026",
-      officialLink: "http://central.edu.gh/news-events/",
-      priority: "important",
-      source: "Office of the Vice-Chancellor",
-      targetAudience: "Graduands, Freshers & Parents",
-      isNew: false
-    },
-    {
-      id: "notice-4",
-      title: "SRC Annual Health Week & Free Medical Screening at School Clinic",
-      summary: "3-day comprehensive student and staff health checkup, blood donation, and NHIS registration at Central University Clinic.",
-      content: "The Central University Students' Representative Council (SRC) in partnership with the School Clinic and Ghana Health Service (GHS) presents the 2026 Campus Health Week. Services include Free Blood Pressure check, BMI & Nutrition consultation, Blood Donation for Ridge Hospital, Hepatitis B screening, and NHIS biometric renewals at the Clinic ground floor.",
-      category: "Clinic & Health",
-      date: "Aug 09, 2026",
-      officialLink: "http://central.edu.gh/student-life/",
-      priority: "important",
-      source: "SRC Secretariat & School Clinic",
-      targetAudience: "All Students, Faculty & Staff",
-      isNew: false
-    },
-    {
-      id: "notice-5",
-      title: "Central Business School (CBS) CEO & Industry Mentorship Lecture",
-      summary: "Distinguished lecture series on 'Fintech & Digital Banking Innovations in West Africa' at Senate Hall A.",
-      content: "Central Business School welcomes leading financial sector executives and technology founders for an interactive mentorship masterclass. Topics explore mobile money interoperability, cross-border payments, and AI in corporate banking. Open to all students.",
-      category: "Academic",
-      date: "Aug 07, 2026",
-      officialLink: "http://central.edu.gh/faculties/",
-      priority: "normal",
-      source: "Central Business School (CBS)",
-      targetAudience: "CBS, IT & Law Students",
-      isNew: false
-    },
-    {
-      id: "notice-6",
-      title: "Campus High-Speed Wi-Fi 6 Upgrades Completed in Hostels & Library",
-      summary: "ICT Directorate activates enhanced fiber-optic Wi-Fi 6 coverage across Trinity Hall, Destiny Hall, and Law Faculty.",
-      content: "The Directorate of ICT has completed the installation of enterprise Wi-Fi 6 access nodes across all residential halls (Trinity & Destiny) and the Main Library. Students should connect to 'CU-Student-Secure' with their institutional email credentials.",
-      category: "Administration",
-      date: "Aug 05, 2026",
-      officialLink: "http://central.edu.gh/ict-services/",
-      priority: "normal",
-      source: "Directorate of ICT Services",
-      targetAudience: "Miotso Campus Residents",
-      isNew: false
-    },
-    {
-      id: "notice-7",
-      title: "2026/2027 Trinity & Destiny Hostel Allocation Portal Active",
-      summary: "Online residential hall room selection and booking guidelines for continuing and incoming undergraduate students.",
-      content: "The Dean of Students Affairs announces that online hostel room reservations for Trinity Hall (Male) and Destiny Hall (Female) are now live. Students must settle the requisite residential accommodation deposit to lock their allocated room number.",
-      category: "SRC",
-      date: "Aug 03, 2026",
-      officialLink: "http://central.edu.gh/hostels/",
-      priority: "important",
-      source: "Dean of Students Affairs",
-      targetAudience: "Undergraduate Residents",
-      isNew: false
-    },
-    {
-      id: "notice-8",
-      title: "Central University Law Journal Volume 12: Call for Papers & Articles",
-      summary: "Submissions invited for peer-reviewed legal journal on Constitutional Jurisprudence & Commercial Law in Ghana.",
-      content: "The Editorial Board of the Central University Law Journal invites legal practitioners, faculty, and law scholars to submit scholarly articles and case reviews for Volume 12. Manuscripts should adhere to OSCOLA citation standards.",
-      category: "Academic",
-      date: "Aug 01, 2026",
-      officialLink: "http://central.edu.gh/law-journal/",
-      priority: "normal",
-      source: "Faculty of Law",
-      targetAudience: "Law Students & Researchers",
-      isNew: false
-    }
-  ];
+  // Official Central University Ghana Notices & Web Updates Data (central.edu.gh) - starts empty as requested
+  const CAMPUS_NOTICES: any[] = [];
 
   // Live Miotso Campus Weather (Open-Meteo with Ghana coordinates)
   app.get('/api/weather', async (_req, res) => {
@@ -1059,11 +999,11 @@ async function startServer() {
     return res.json({ success: true, message: 'Notices reset to default', notices: campusNoticesStore });
   });
 
-  // Universal Campus Search Endpoint (Buildings)
+  // Universal Campus Search Endpoint (Buildings & Marketplace)
   app.get('/api/gps/search', (req, res) => {
     const q = (req.query.q as string || '').toLowerCase().trim();
     if (!q) {
-      return res.json({ buildings: [], count: 0 });
+      return res.json({ buildings: [], products: [], count: 0, totalCount: 0 });
     }
 
     const matchedBuildings = [
@@ -1080,7 +1020,20 @@ async function startServer() {
       { id: 'main-gate', name: 'Central University Main Gate (Accra-Aflao Rd)', code: 'GATE-01', category: 'Administrative' },
     ].filter(b => b.name.toLowerCase().includes(q) || b.code.toLowerCase().includes(q) || b.category.toLowerCase().includes(q));
 
-    return res.json({ buildings: matchedBuildings, count: matchedBuildings.length });
+    const matchedProducts = (typeof campusProductsStore !== 'undefined' && Array.isArray(campusProductsStore))
+      ? campusProductsStore.filter(p => 
+          (p.title && p.title.toLowerCase().includes(q)) ||
+          (p.category && p.category.toLowerCase().includes(q)) ||
+          (p.description && p.description.toLowerCase().includes(q))
+        )
+      : [];
+
+    return res.json({ 
+      buildings: matchedBuildings, 
+      products: matchedProducts, 
+      count: matchedBuildings.length + matchedProducts.length,
+      totalCount: matchedBuildings.length + matchedProducts.length
+    });
   });
 
   // Avatar update endpoint

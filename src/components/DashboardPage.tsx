@@ -4,11 +4,12 @@ import {
   ShoppingBag, Navigation, Stethoscope, LogOut, Sparkles, MapPin, 
   ChevronRight, User as UserIcon, Search, Tag, X, ArrowUpRight, FileText, 
   Download, CloudSun, DollarSign, Thermometer, Camera, Edit3, CheckCircle2, Globe, PlusCircle,
-  Smartphone, Shield
+  Smartphone, Shield, Trash2
 } from 'lucide-react';
-import { User, Building, Product } from '../types';
+import { User, Building, Product, detectGenderFromName } from '../types';
 import { CampusUpdatesCard } from './CampusUpdatesCard';
 import { useTheme, ThemeToggle } from '../context/ThemeContext';
+import { ActionTooltip } from './ActionTooltip';
 
 interface DashboardPageProps {
   user: User;
@@ -80,7 +81,19 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
         const ct = res.headers.get('content-type') || '';
         if (!ct.includes('application/json')) throw new Error('Expected JSON response');
         const data = await res.json();
-        setSearchResults(data);
+        const buildings = Array.isArray(data?.buildings) ? data.buildings : [];
+        const products = Array.isArray(data?.products) ? data.products : [];
+        const totalCount = typeof data?.totalCount === 'number' 
+          ? data.totalCount 
+          : typeof data?.count === 'number' 
+          ? data.count 
+          : (buildings.length + products.length);
+
+        setSearchResults({
+          buildings,
+          products,
+          totalCount
+        });
       } catch (err) {
         console.error('Backend search error', err);
       } finally {
@@ -134,6 +147,27 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
     }
   };
 
+  const handleRemoveAvatar = () => {
+    const derivedGender = user.gender || detectGenderFromName(user.name);
+    const defaultAvatar = derivedGender === 'female'
+      ? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=300'
+      : 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&q=80&w=300';
+
+    setAvatarUrl(defaultAvatar);
+    user.avatar = defaultAvatar;
+    setAvatarUpdateMsg('Removed profile picture. Reverted to gender default avatar.');
+    setTimeout(() => {
+      setAvatarUpdateMsg(null);
+      setShowAvatarModal(false);
+    }, 1500);
+
+    fetch('/api/auth/update-avatar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: user.email, avatar: defaultAvatar })
+    }).catch(err => console.error('Avatar remove failed', err));
+  };
+
   const isDark = theme === 'dark';
 
   return (
@@ -144,14 +178,14 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
       <motion.header
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className={`flex flex-wrap items-center justify-between gap-4 p-4 rounded-3xl backdrop-blur-md shadow-lg transition-all ${
+        className={`flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 p-3.5 sm:p-4 lg:p-5 rounded-3xl backdrop-blur-md shadow-lg transition-all ${
           isDark 
             ? 'bg-[#0a1424]/90 border border-[#ff073a]/40 shadow-[0_0_30px_rgba(255,7,58,0.2)]' 
             : 'bg-white/95 border border-red-200/80 shadow-red-100/50'
         }`}
       >
         <div className="flex items-center gap-3">
-          <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-[#ff073a] to-[#7a031a] flex items-center justify-center font-black text-white text-xl shadow-[0_0_20px_rgba(255,7,58,0.5)] border border-[#ff3366]/40">
+          <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-[#ff073a] to-[#7a031a] flex items-center justify-center font-black text-white text-xl shadow-[0_0_20px_rgba(255,7,58,0.5)] border border-[#ff3366]/40 shrink-0">
             C
           </div>
           <div>
@@ -169,108 +203,90 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
           </div>
         </div>
 
-        <div className="flex items-center gap-2.5 sm:gap-3">
-          {/* User Profile Avatar & Badge */}
-          <button
-            onClick={() => setShowAvatarModal(true)}
-            id="user-profile-badge-button"
-            className={`flex items-center gap-2.5 p-1.5 pr-3 rounded-full text-xs transition-colors cursor-pointer border ${
-              isDark 
-                ? 'bg-slate-800 hover:bg-slate-700/80 border-slate-700 text-slate-200' 
-                : 'bg-slate-50 hover:bg-red-50 border-slate-200 hover:border-red-200 text-slate-800'
-            }`}
-            title="Click to insert or change profile picture"
-          >
-            <div className="relative w-8 h-8 rounded-full overflow-hidden border-2 border-[#CE1126] shadow-sm shrink-0">
+        {/* Streamlined Minimalist Horizontal Action Bar */}
+        <div className="flex items-center gap-2 sm:gap-2.5 overflow-x-auto no-scrollbar py-1 px-1 -mx-1 max-w-full justify-start lg:justify-end">
+          {/* User Profile Avatar & Badge Button */}
+          <ActionTooltip label={`${user.name} (${user.role}) • Change Photo`}>
+            <button
+              onClick={() => setShowAvatarModal(true)}
+              id="user-profile-badge-button"
+              aria-label={`User Profile: ${user.name} (${user.role})`}
+              className="relative w-10 h-10 lg:w-11 lg:h-11 min-w-[40px] min-h-[40px] lg:min-w-[44px] lg:min-h-[44px] rounded-full overflow-hidden border-2 border-[#ff073a] shadow-md hover:scale-105 active:scale-95 transition-all cursor-pointer p-0.5 bg-slate-900 shrink-0"
+            >
               <img
                 src={avatarUrl}
                 alt={user.name}
-                className="w-full h-full object-cover"
+                className="w-full h-full object-cover rounded-full"
               />
-              <div className="absolute inset-0 bg-black/20 hover:bg-black/40 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
-                <Camera className="w-3 h-3 text-white" />
+              <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity rounded-full">
+                <Camera className="w-3.5 h-3.5 text-white" />
               </div>
-            </div>
-            <div className="text-left hidden sm:block">
-              <p className={`font-bold leading-tight truncate max-w-[120px] ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                {user.name}
-              </p>
-              <span className="text-[9px] uppercase font-extrabold text-[#CE1126]">
-                {user.role}
-              </span>
-            </div>
-          </button>
+            </button>
+          </ActionTooltip>
 
-          {/* + Sell on Market Header Quick Action */}
-          <button
-            onClick={() => onSelectOption('shop', '', true)}
-            id="sell-on-market-header"
-            className="flex items-center gap-1.5 bg-[#CE1126] hover:bg-[#A00D1D] text-white font-extrabold text-xs px-3.5 py-2 rounded-full shadow-md shadow-red-200 transition-all cursor-pointer hover:scale-105 active:scale-95"
-            title="List an Item to Sell on Marketplace"
-          >
-            <PlusCircle className="w-3.5 h-3.5 text-white" />
-            <span>+ Sell on Market</span>
-          </button>
+          {/* + Sell on Market Header Quick Action (Pure Icon Symbol + Tooltip) */}
+          <ActionTooltip label="Sell on Market (+ List Item)">
+            <button
+              onClick={() => onSelectOption('shop', '', true)}
+              id="sell-on-market-header"
+              aria-label="List an Item to Sell on Marketplace"
+              className="w-10 h-10 lg:w-11 lg:h-11 min-w-[40px] min-h-[40px] lg:min-w-[44px] lg:min-h-[44px] rounded-full flex items-center justify-center bg-[#CE1126] hover:bg-[#A00D1D] text-white shadow-md shadow-red-500/20 transition-all cursor-pointer hover:scale-105 active:scale-95 shrink-0"
+            >
+              <PlusCircle className="w-5 h-5 text-white" />
+            </button>
+          </ActionTooltip>
 
-          {/* Download README (.docx) Button */}
-          <a
-            href="/Central_Mall_README.docx"
-            download="Central_Mall_README.docx"
-            id="download-readme-header"
-            className={`flex items-center gap-1.5 font-extrabold text-xs px-3.5 py-2 rounded-full shadow-sm transition-all cursor-pointer border ${
-              isDark
-                ? 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700'
-                : 'bg-slate-100 hover:bg-slate-200 border-slate-300 text-slate-800'
-            }`}
-            title="Download README in Word (.docx) format"
-          >
-            <Download className="w-3.5 h-3.5 text-[#CE1126]" />
-            <span className="hidden md:inline">README.docx</span>
-          </a>
-
-          {/* PWA App Download Button */}
-          <button
-            onClick={() => {
-              window.dispatchEvent(new CustomEvent('open-pwa-install'));
-            }}
-            id="pwa-app-download-header"
-            className={`flex items-center gap-1.5 font-extrabold text-xs px-3.5 py-2 rounded-full shadow-sm transition-all cursor-pointer border ${
-              isDark
-                ? 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700'
-                : 'bg-slate-100 hover:bg-slate-200 border-slate-300 text-slate-800'
-            }`}
-            title="Download / Install Central Mall PWA App & Favicon Suite"
-          >
-            <Smartphone className="w-3.5 h-3.5 text-[#ff073a]" />
-            <span className="hidden lg:inline">PWA App</span>
-          </button>
+          {/* PWA App Download Button (Pure Icon Symbol + Tooltip) */}
+          <ActionTooltip label="Install Central Mall PWA App">
+            <button
+              onClick={() => {
+                window.dispatchEvent(new CustomEvent('open-pwa-install'));
+              }}
+              id="pwa-app-download-header"
+              aria-label="Download and Install Central Mall PWA App"
+              className={`w-10 h-10 lg:w-11 lg:h-11 min-w-[40px] min-h-[40px] lg:min-w-[44px] lg:min-h-[44px] rounded-full flex items-center justify-center shadow-sm transition-all cursor-pointer border hover:scale-105 active:scale-95 shrink-0 ${
+                isDark
+                  ? 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700'
+                  : 'bg-slate-100 hover:bg-slate-200 border-slate-300 text-slate-800'
+              }`}
+            >
+              <Smartphone className="w-5 h-5 text-[#ff073a]" />
+            </button>
+          </ActionTooltip>
 
           {/* Theme Switcher Toggle */}
-          <ThemeToggle />
+          <ActionTooltip label={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}>
+            <ThemeToggle className="w-10 h-10 lg:w-11 lg:h-11 min-w-[40px] min-h-[40px] lg:min-w-[44px] lg:min-h-[44px] flex items-center justify-center p-0 shrink-0" />
+          </ActionTooltip>
 
-          {/* AI Assistant Quick Button */}
-          <button
-            onClick={onOpenAIChat}
-            id="open-ai-chat-header"
-            className="flex items-center gap-1.5 bg-[#CE1126] hover:bg-[#A00D1D] text-white font-extrabold text-xs px-4 py-2 rounded-full shadow-md shadow-red-200 transition-all cursor-pointer"
-          >
-            <Sparkles className="w-4 h-4 text-amber-200" />
-            <span>Campus AI</span>
-          </button>
+          {/* AI Assistant Quick Button (Pure Icon Symbol + Tooltip) */}
+          <ActionTooltip label="Campus AI Assistant">
+            <button
+              onClick={onOpenAIChat}
+              id="open-ai-chat-header"
+              aria-label="Open Campus AI Assistant"
+              className="relative w-10 h-10 lg:w-11 lg:h-11 min-w-[40px] min-h-[40px] lg:min-w-[44px] lg:min-h-[44px] rounded-full flex items-center justify-center bg-[#CE1126] hover:bg-[#A00D1D] text-white shadow-md shadow-red-500/20 transition-all cursor-pointer hover:scale-105 active:scale-95 shrink-0"
+            >
+              <Sparkles className="w-5 h-5 text-amber-200" />
+              <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-amber-400 rounded-full border-2 border-white dark:border-slate-900 animate-pulse" />
+            </button>
+          </ActionTooltip>
 
-          {/* Logout Button */}
-          <button
-            onClick={onLogout}
-            id="logout-button"
-            title="Log Out"
-            className={`p-2 rounded-full transition-colors cursor-pointer border ${
-              isDark
-                ? 'bg-slate-800 hover:bg-red-950/60 border-slate-700 text-slate-300 hover:text-red-400'
-                : 'bg-slate-100 hover:bg-red-50 border-slate-200 hover:border-red-200 text-slate-600 hover:text-[#CE1126]'
-            }`}
-          >
-            <LogOut className="w-4 h-4" />
-          </button>
+          {/* Logout Button (Pure Icon Symbol + Tooltip) */}
+          <ActionTooltip label="Log Out">
+            <button
+              onClick={onLogout}
+              id="logout-button"
+              aria-label="Log Out"
+              className={`w-10 h-10 lg:w-11 lg:h-11 min-w-[40px] min-h-[40px] lg:min-w-[44px] lg:min-h-[44px] rounded-full flex items-center justify-center transition-colors cursor-pointer border hover:scale-105 active:scale-95 shrink-0 ${
+                isDark
+                  ? 'bg-slate-800 hover:bg-red-950/60 border-slate-700 text-slate-300 hover:text-red-400'
+                  : 'bg-slate-100 hover:bg-red-50 border-slate-200 hover:border-red-200 text-slate-600 hover:text-[#CE1126]'
+              }`}
+            >
+              <LogOut className="w-5 h-5" />
+            </button>
+          </ActionTooltip>
         </div>
       </motion.header>
 
@@ -379,17 +395,17 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
               >
                 {searching ? (
                   <p className="text-xs text-slate-400 py-3 text-center">Searching Miotso Campus...</p>
-                ) : searchResults.totalCount === 0 ? (
+                ) : (searchResults.totalCount === 0 || ((searchResults.buildings?.length || 0) === 0 && (searchResults.products?.length || 0) === 0)) ? (
                   <p className="text-xs text-slate-400 py-3 text-center">No campus results found for "{globalSearch}"</p>
                 ) : (
                   <div className="space-y-3">
-                    {searchResults.buildings.length > 0 && (
+                    {Boolean(searchResults.buildings && searchResults.buildings.length > 0) && (
                       <div>
                         <p className="text-[10px] font-black uppercase text-[#CE1126] tracking-wider mb-1.5">
-                          Campus Buildings & Landmarks ({searchResults.buildings.length})
+                          Campus Buildings & Landmarks ({searchResults.buildings?.length || 0})
                         </p>
                         <div className="space-y-1">
-                          {searchResults.buildings.map((b) => (
+                          {(searchResults.buildings || []).map((b) => (
                             <button
                               key={b.id}
                               onClick={() => onSelectOption('gps', b.name)}
@@ -411,13 +427,13 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                       </div>
                     )}
 
-                    {searchResults.products.length > 0 && (
+                    {Boolean(searchResults.products && searchResults.products.length > 0) && (
                       <div className={`pt-2 border-t ${isDark ? 'border-slate-800' : 'border-slate-100'}`}>
                         <p className="text-[10px] font-black uppercase text-[#CE1126] tracking-wider mb-1.5">
-                          Marketplace Items ({searchResults.products.length})
+                          Marketplace Items ({searchResults.products?.length || 0})
                         </p>
                         <div className="space-y-1">
-                          {searchResults.products.map((p) => (
+                          {(searchResults.products || []).map((p) => (
                             <button
                               key={p.id}
                               onClick={() => onSelectOption('shop', p.title)}
@@ -686,6 +702,19 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                     Save
                   </button>
                 </div>
+
+                <button
+                  type="button"
+                  onClick={handleRemoveAvatar}
+                  className={`w-full py-2.5 rounded-xl text-xs font-bold transition-all border cursor-pointer flex items-center justify-center gap-1.5 ${
+                    isDark 
+                      ? 'bg-red-950/40 hover:bg-red-900/50 border-red-800/80 text-red-300' 
+                      : 'bg-red-50 hover:bg-red-100 border-red-200 text-[#CE1126]'
+                  }`}
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Remove Added Profile Picture</span>
+                </button>
               </div>
             </motion.div>
           </div>
