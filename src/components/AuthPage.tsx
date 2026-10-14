@@ -2,10 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   User, LogIn, UserPlus, ArrowLeft, Shield, Mail, Lock, Phone, 
-  GraduationCap, Store, UserCheck, AlertCircle, CheckCircle2, Camera, Upload, ArrowRight
+  GraduationCap, Store, UserCheck, AlertCircle, CheckCircle2, Camera, Upload, ArrowRight, Sparkles, X
 } from 'lucide-react';
-import { User as UserType, detectGenderFromName } from '../types';
+import { User as UserType } from '../types';
 import { useTheme, ThemeToggle } from '../context/ThemeContext';
+import { AVATAR_PROFILES, svgToDataUri, getRandomAvatarDataUri } from '../data/avatars';
 
 interface AuthPageProps {
   onLogin: (user: UserType) => void;
@@ -44,7 +45,6 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLogin, onBackToWelcome }) 
 
   // For first-time users, default to Registration so they sign up first
   const [isLoginView, setIsLoginView] = useState<boolean>(() => {
-    // If no one has signed up yet, start directly on Sign Up view!
     try {
       const stored = localStorage.getItem('central_mall_registered_users');
       if (stored) {
@@ -59,6 +59,9 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLogin, onBackToWelcome }) 
     return false; // Default to Sign Up for first users!
   });
 
+  // 4-Fold Sign Up Wizard Step (1, 2, 3, 4)
+  const [signupStep, setSignupStep] = useState<number>(1);
+
   // Form Fields
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -66,8 +69,11 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLogin, onBackToWelcome }) 
   const [phone, setPhone] = useState('');
   const [role, setRole] = useState<'student' | 'merchant' | 'visitor'>('student');
   const [studentId, setStudentId] = useState('');
-  const [gender, setGender] = useState<'male' | 'female' | 'other'>('male');
+  const [gender, setGender] = useState<'male' | 'female'>('male'); // Restricted to Male and Female
   const [avatarPreview, setAvatarPreview] = useState<string>('');
+
+  // Avatar Selector Modal State
+  const [isAvatarModalOpen, setIsAvatarModalOpen] = useState(false);
 
   // Status & Feedback State
   const [loading, setLoading] = useState(false);
@@ -117,12 +123,52 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLogin, onBackToWelcome }) 
   // Switch to sign up tab and pre-fill email
   const handleSwitchToSignUp = () => {
     setIsLoginView(false);
+    setSignupStep(1);
     setErrorMessage(null);
     setShowSignupPrompt(false);
     setSuccessMessage(null);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  // Step validation helpers for the 4-fold wizard
+  const handleNextStep = () => {
+    setErrorMessage(null);
+    if (signupStep === 1) {
+      if (!name.trim()) {
+        setErrorMessage('Please enter your full name.');
+        return;
+      }
+      if (!gender) {
+        setErrorMessage('Please select your gender.');
+        return;
+      }
+    } else if (signupStep === 2) {
+      if (!email.trim() || !email.includes('@')) {
+        setErrorMessage('Please enter a valid email address.');
+        return;
+      }
+      if (!password.trim() || password.length < 4) {
+        setErrorMessage('Password must be at least 4 characters.');
+        return;
+      }
+    } else if (signupStep === 3) {
+      if (!role) {
+        setErrorMessage('Please select your campus role.');
+        return;
+      }
+    }
+    setSignupStep(prev => Math.min(prev + 1, 4));
+  };
+
+  const handlePrevStep = () => {
+    setErrorMessage(null);
+    if (signupStep > 1) {
+      setSignupStep(prev => prev - 1);
+    } else {
+      onBackToWelcome();
+    }
+  };
+
+  const handleSubmitLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
     setShowSignupPrompt(false);
@@ -131,192 +177,155 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLogin, onBackToWelcome }) 
     const cleanEmail = email.trim().toLowerCase();
     const cleanPassword = password.trim();
 
-    if (!cleanEmail) {
-      setErrorMessage('Please provide your email address.');
-      return;
-    }
-
-    if (!cleanPassword) {
-      setErrorMessage('Please enter your password.');
+    if (!cleanEmail || !cleanPassword) {
+      setErrorMessage('Please provide both email and password.');
       return;
     }
 
     setLoading(true);
 
     try {
-      if (isLoginView) {
-        // --- STRICT LOGIN FLOW ---
-        // A user MUST have signed up first!
-        const localAccounts = getLocalRegisteredUsers();
-        const foundLocal = localAccounts.find(u => u.email.toLowerCase() === cleanEmail);
+      const localAccounts = getLocalRegisteredUsers();
+      const foundLocal = localAccounts.find(u => u.email.toLowerCase() === cleanEmail);
 
-        let serverRes: Response | null = null;
-        let serverData: any = null;
+      let serverRes: Response | null = null;
+      let serverData: any = null;
 
-        try {
-          serverRes = await fetch('/api/auth/login', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              email: cleanEmail,
-              password: cleanPassword,
-            }),
-          });
-          serverData = await serverRes.json();
-        } catch (fetchErr) {
-          console.warn('Backend login fetch error:', fetchErr);
-        }
+      try {
+        serverRes = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: cleanEmail, password: cleanPassword }),
+        });
+        serverData = await serverRes.json();
+      } catch (fetchErr) {
+        console.warn('Backend login fetch error:', fetchErr);
+      }
 
-        // Case 1: Server confirmed successful login
-        if (serverRes && serverRes.ok && serverData && serverData.user) {
-          setSuccessMessage(serverData.message || 'Login successful! Entering Central Mall...');
-          setTimeout(() => {
-            onLogin(serverData.user);
-          }, 450);
-          return;
-        }
+      if (serverRes && serverRes.ok && serverData && serverData.user) {
+        setSuccessMessage(serverData.message || 'Login successful! Entering Central Mall...');
+        setTimeout(() => onLogin(serverData.user), 450);
+        return;
+      }
 
-        // Case 2: User exists locally (e.g. registered in this browser)
-        if (foundLocal) {
-          if (foundLocal.password && foundLocal.password !== cleanPassword) {
-            setErrorMessage('Incorrect password. Please verify your password and try again.');
-            setLoading(false);
-            return;
-          }
-
-          // Local password matches, log in
-          const loggedUser: UserType = {
-            id: foundLocal.id,
-            name: foundLocal.name,
-            email: foundLocal.email,
-            role: foundLocal.role,
-            studentId: foundLocal.studentId,
-            phone: foundLocal.phone,
-            avatar: foundLocal.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=300',
-          };
-
-          setSuccessMessage('Welcome back! Logging into Central Mall...');
-          setTimeout(() => {
-            onLogin(loggedUser);
-          }, 450);
-          return;
-        }
-
-        // Case 3: Server returned 401 (wrong password for existing user)
-        if (serverRes && serverRes.status === 401) {
-          setErrorMessage(serverData?.message || 'Incorrect password. Please check your credentials.');
+      if (foundLocal) {
+        if (foundLocal.password && foundLocal.password !== cleanPassword) {
+          setErrorMessage('Incorrect password. Please verify and try again.');
           setLoading(false);
           return;
         }
 
-        // Case 4: USER HAS NOT SIGNED UP!
-        // Enforce requirement: MUST NOT allow login. Must sign up first!
-        setErrorMessage(
-          `No account found for "${cleanEmail}". You must sign up first before you can log in to Central Mall!`
-        );
-        setShowSignupPrompt(true);
+        const loggedUser: UserType = {
+          id: foundLocal.id,
+          name: foundLocal.name,
+          email: foundLocal.email,
+          role: foundLocal.role,
+          studentId: foundLocal.studentId,
+          phone: foundLocal.phone,
+          avatar: foundLocal.avatar || getRandomAvatarDataUri(),
+        };
+
+        setSuccessMessage('Welcome back! Logging into Central Mall...');
+        setTimeout(() => onLogin(loggedUser), 450);
+        return;
+      }
+
+      if (serverRes && serverRes.status === 401) {
+        setErrorMessage(serverData?.message || 'Incorrect password.');
         setLoading(false);
         return;
-      } else {
-        // --- REGISTRATION / SIGN UP FLOW ---
-        const cleanName = name.trim();
-        if (!cleanName) {
-          setErrorMessage('Please enter your full name to create an account.');
-          setLoading(false);
-          return;
-        }
+      }
 
-        if (cleanPassword.length < 4) {
-          setErrorMessage('Password must be at least 4 characters.');
-          setLoading(false);
-          return;
-        }
+      setErrorMessage(`No account found for "${cleanEmail}". You must sign up first!`);
+      setShowSignupPrompt(true);
+      setLoading(false);
+    } catch (err: any) {
+      setErrorMessage('Could not log in. Please sign up first.');
+      setShowSignupPrompt(true);
+      setLoading(false);
+    }
+  };
 
-        let registeredUser: UserType | null = null;
-        let serverRes: Response | null = null;
-        let serverData: any = null;
+  const handleFinalSignupSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    setLoading(true);
 
-        const finalGender = gender || detectGenderFromName(cleanName);
-        const defaultAvatar = finalGender === 'female'
-          ? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=300'
-          : 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&q=80&w=300';
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanName = name.trim();
+    const cleanPassword = password.trim();
 
-        const finalAvatar = avatarPreview || defaultAvatar;
+    try {
+      let registeredUser: UserType | null = null;
+      let serverRes: Response | null = null;
+      let serverData: any = null;
 
-        try {
-          serverRes = await fetch('/api/auth/register', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              name: cleanName,
-              email: cleanEmail,
-              password: cleanPassword,
-              role,
-              gender,
-              phone: phone.trim() || undefined,
-              studentId: role === 'student' ? (studentId.trim() || `CU-2026-${Math.floor(1000 + Math.random() * 9000)}`) : undefined,
-              avatar: finalAvatar,
-            }),
-          });
-          serverData = await serverRes.json();
-        } catch (fetchErr) {
-          console.warn('Backend register fetch error:', fetchErr);
-        }
+      // Decommission all Unsplash fallbacks. If blank, pick a random avatar from AVATAR_PROFILES.
+      const finalAvatar = avatarPreview || getRandomAvatarDataUri();
 
-        if (serverRes && !serverRes.ok && serverData && serverData.message && !serverData.success) {
-          // If server reports account already exists
-          if (serverRes.status === 400 && serverData.message.includes('already exists')) {
-            setErrorMessage('An account with this email already exists! Please click "Log In" above to sign in.');
-            setLoading(false);
-            return;
-          }
-        }
-
-        if (serverRes && serverRes.ok && serverData && serverData.user) {
-          registeredUser = serverData.user;
-        } else {
-          // Construct client registered user
-          registeredUser = {
-            id: `usr_${Date.now()}`,
+      try {
+        serverRes = await fetch('/api/auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
             name: cleanName,
             email: cleanEmail,
+            password: cleanPassword,
             role,
             gender,
-            studentId: role === 'student' ? (studentId.trim() || `CU-2026-${Math.floor(1000 + Math.random() * 9000)}`) : undefined,
             phone: phone.trim() || undefined,
+            studentId: role === 'student' ? (studentId.trim() || `CU-2026-${Math.floor(1000 + Math.random() * 9000)}`) : undefined,
             avatar: finalAvatar,
-          };
-        }
+          }),
+        });
+        serverData = await serverRes.json();
+      } catch (fetchErr) {
+        console.warn('Backend register fetch error:', fetchErr);
+      }
 
-        if (registeredUser) {
-          // Save registered account so future logins work
-          saveLocalRegisteredUser({
-            id: registeredUser.id,
-            name: registeredUser.name,
-            email: registeredUser.email,
-            password: cleanPassword,
-            role: registeredUser.role as any,
-            gender,
-            studentId: registeredUser.studentId,
-            phone: phone.trim(),
-            avatar: finalAvatar,
-          });
+      if (serverRes && !serverRes.ok && serverData && serverData.message && serverData.message.includes('already exists')) {
+        setErrorMessage('An account with this email already exists! Please click "Log In" above.');
+        setLoading(false);
+        return;
+      }
 
-          setSuccessMessage(`Account created successfully! Welcome to Central Mall, ${cleanName}.`);
-          setTimeout(() => {
-            if (registeredUser) onLogin(registeredUser);
-          }, 500);
-          return;
-        }
+      if (serverRes && serverRes.ok && serverData && serverData.user) {
+        registeredUser = serverData.user;
+      } else {
+        registeredUser = {
+          id: `usr_${Date.now()}`,
+          name: cleanName,
+          email: cleanEmail,
+          role,
+          gender,
+          studentId: role === 'student' ? (studentId.trim() || `CU-2026-${Math.floor(1000 + Math.random() * 9000)}`) : undefined,
+          phone: phone.trim() || undefined,
+          avatar: finalAvatar,
+        };
+      }
+
+      if (registeredUser) {
+        saveLocalRegisteredUser({
+          id: registeredUser.id,
+          name: registeredUser.name,
+          email: registeredUser.email,
+          password: cleanPassword,
+          role: registeredUser.role as any,
+          gender,
+          studentId: registeredUser.studentId,
+          phone: phone.trim(),
+          avatar: finalAvatar,
+        });
+
+        setSuccessMessage(`Account created successfully! Welcome to Central Mall, ${cleanName}.`);
+        setTimeout(() => {
+          if (registeredUser) onLogin(registeredUser);
+        }, 500);
+        return;
       }
     } catch (err: any) {
-      console.error('Authentication error:', err);
-      if (isLoginView) {
-        setErrorMessage('Could not log in. You must sign up first before logging in.');
-        setShowSignupPrompt(true);
-      } else {
-        setErrorMessage('Failed to complete registration. Please check your network and try again.');
-      }
+      setErrorMessage('Failed to complete registration. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -329,6 +338,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLogin, onBackToWelcome }) 
       {/* Top Bar with Back Button & Theme Switcher */}
       <div className="w-full max-w-md flex items-center justify-between mb-6">
         <button
+          type="button"
           onClick={onBackToWelcome}
           id="back-to-welcome-button"
           className={`flex items-center gap-2 text-sm font-bold px-3.5 py-1.5 rounded-full backdrop-blur-md shadow-sm transition-colors cursor-pointer border ${
@@ -358,7 +368,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLogin, onBackToWelcome }) 
       <motion.div
         initial={{ opacity: 0, y: 20, scale: 0.96 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
-        transition={{ duration: 0.5 }}
+        transition={{ duration: 0.4 }}
         className={`w-full max-w-md rounded-3xl p-6 md:p-8 backdrop-blur-xl shadow-2xl relative overflow-hidden text-left border ${
           isDark 
             ? 'bg-gradient-to-b from-[#0a1424]/95 via-[#12121c]/95 to-[#060a14]/95 border-[#ff073a]/40 shadow-[0_0_40px_rgba(255,7,58,0.25)] text-slate-100' 
@@ -368,40 +378,15 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLogin, onBackToWelcome }) 
         {/* Glow Header Accent in Navy, Neon Red & Central Crimson */}
         <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-[#002147] via-[#ff073a] to-[#CE1126]" />
 
-        {/* First-time user instruction banner */}
-        {!hasExistingAccounts && (
-          <div className={`mb-5 p-2.5 rounded-2xl text-xs flex items-center gap-2 font-semibold border ${
-            isDark 
-              ? 'bg-amber-950/40 border-amber-800/60 text-amber-200' 
-              : 'bg-amber-50 border-amber-200 text-amber-800'
-          }`}>
-            <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse shrink-0" />
-            <span>First time visiting? Please <strong>Sign Up</strong> below to create your account before logging in.</span>
-          </div>
-        )}
-
-        <div className="text-center mb-6">
-          <div className="w-14 h-14 mx-auto mb-3 rounded-2xl bg-gradient-to-br from-[#ff073a] to-[#7a031a] text-white flex items-center justify-center shadow-[0_0_20px_rgba(255,7,58,0.5)] border border-[#ff3366]/40">
-            {isLoginView ? <LogIn className="w-7 h-7" /> : <UserPlus className="w-7 h-7" />}
-          </div>
-          <h2 className={`text-2xl font-black tracking-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>
-            {isLoginView ? 'Sign In to Central Mall' : 'Create Central Account'}
-          </h2>
-          <p className={`text-xs font-medium mt-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-            {isLoginView 
-              ? 'Enter your registered email and password to log in' 
-              : 'Sign up first with your details to access Central Mall'}
-          </p>
-        </div>
-
         {/* Tab Switcher */}
-        <div className={`grid grid-cols-2 p-1 rounded-xl mb-4 border ${
+        <div className={`grid grid-cols-2 p-1 rounded-xl mb-6 border ${
           isDark ? 'bg-slate-950/90 border-gray-800' : 'bg-slate-100 border-slate-200'
         }`}>
           <button
             type="button"
             onClick={() => {
               setIsLoginView(false);
+              setSignupStep(1);
               setErrorMessage(null);
               setShowSignupPrompt(false);
               setSuccessMessage(null);
@@ -414,7 +399,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLogin, onBackToWelcome }) 
             }`}
           >
             <UserPlus className="w-3.5 h-3.5" />
-            <span>1. Sign Up First</span>
+            <span>Sign Up Wizard</span>
           </button>
           <button
             type="button"
@@ -432,7 +417,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLogin, onBackToWelcome }) 
             }`}
           >
             <LogIn className="w-3.5 h-3.5" />
-            <span>2. Log In</span>
+            <span>Log In</span>
           </button>
         </div>
 
@@ -454,7 +439,6 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLogin, onBackToWelcome }) 
                 <p className="font-bold flex-1">{errorMessage}</p>
               </div>
 
-              {/* Explicit Sign Up Call-To-Action if user tried to log in without an account */}
               {showSignupPrompt && (
                 <button
                   type="button"
@@ -486,104 +470,38 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLogin, onBackToWelcome }) 
           )}
         </AnimatePresence>
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="space-y-3.5 text-left">
-          {!isLoginView && (
-            <>
-              {/* Picture Upload for Registration Avatar */}
-              <div>
-                <label className={`block text-xs font-bold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
-                  Profile Picture (Optional)
-                </label>
-                <div className="flex items-center gap-3">
-                  <div className={`relative w-14 h-14 rounded-2xl border-2 border-dashed overflow-hidden flex items-center justify-center shrink-0 ${
-                    isDark ? 'bg-slate-800 border-slate-700' : 'bg-slate-100 border-slate-300'
-                  }`}>
-                    {avatarPreview ? (
-                      <img
-                        src={avatarPreview}
-                        alt="Avatar Preview"
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <Camera className="w-6 h-6 text-slate-400" />
-                    )}
-                  </div>
-                  <div className="flex-1">
-                    <label className={`inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-xl cursor-pointer transition-colors shadow-sm border ${
-                      isDark 
-                        ? 'bg-red-950/60 hover:bg-red-900/60 border-red-800 text-red-300' 
-                        : 'bg-red-50 hover:bg-red-100 border-red-200 text-[#CE1126]'
-                    }`}>
-                      <Upload className="w-3.5 h-3.5" />
-                      <span>Choose Picture</span>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={handleImageFileChange}
-                        className="hidden"
-                      />
-                    </label>
-                    <p className="text-[10px] text-slate-400 mt-1">PNG, JPG, WEBP (Photo preview)</p>
-                  </div>
-                </div>
+        {/* --- LOGIN VIEW --- */}
+        {isLoginView ? (
+          <div>
+            <div className="text-center mb-6">
+              <div className="w-14 h-14 mx-auto mb-3 rounded-2xl bg-gradient-to-br from-[#ff073a] to-[#7a031a] text-white flex items-center justify-center shadow-[0_0_20px_rgba(255,7,58,0.5)] border border-[#ff3366]/40">
+                <LogIn className="w-7 h-7" />
               </div>
+              <h2 className={`text-2xl font-black tracking-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                Sign In to Central Mall
+              </h2>
+              <p className={`text-xs font-medium mt-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                Enter your registered email and password to access your account
+              </p>
+            </div>
 
-              {/* Gender Selection for Auto Avatar */}
+            <form onSubmit={handleSubmitLogin} className="space-y-4 text-left">
               <div>
                 <label className={`block text-xs font-bold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
-                  Gender <span className="text-[10px] text-slate-400 font-normal">(Used for automatic avatar if no picture is added)</span>
-                </label>
-                <div className="grid grid-cols-3 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setGender('male')}
-                    className={`py-2 px-2 text-xs font-bold rounded-xl border flex items-center justify-center gap-1 cursor-pointer transition-all ${
-                      gender === 'male'
-                        ? 'bg-[#CE1126] border-[#CE1126] text-white shadow-sm'
-                        : isDark ? 'bg-slate-800 border-slate-700 text-slate-300 hover:border-[#CE1126]' : 'bg-slate-50 border-slate-200 text-slate-600 hover:border-[#CE1126]'
-                    }`}
-                  >
-                    <span>Male</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setGender('female')}
-                    className={`py-2 px-2 text-xs font-bold rounded-xl border flex items-center justify-center gap-1 cursor-pointer transition-all ${
-                      gender === 'female'
-                        ? 'bg-[#CE1126] border-[#CE1126] text-white shadow-sm'
-                        : isDark ? 'bg-slate-800 border-slate-700 text-slate-300 hover:border-[#CE1126]' : 'bg-slate-50 border-slate-200 text-slate-600 hover:border-[#CE1126]'
-                    }`}
-                  >
-                    <span>Female</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setGender('other')}
-                    className={`py-2 px-2 text-xs font-bold rounded-xl border flex items-center justify-center gap-1 cursor-pointer transition-all ${
-                      gender === 'other'
-                        ? 'bg-[#CE1126] border-[#CE1126] text-white shadow-sm'
-                        : isDark ? 'bg-slate-800 border-slate-700 text-slate-300 hover:border-[#CE1126]' : 'bg-slate-50 border-slate-200 text-slate-600 hover:border-[#CE1126]'
-                    }`}
-                  >
-                    <span>Other</span>
-                  </button>
-                </div>
-              </div>
-
-              <div>
-                <label className={`block text-xs font-bold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
-                  Full Name <span className="text-red-500">*</span>
+                  Email Address <span className="text-red-500">*</span>
                 </label>
                 <div className="relative">
-                  <User className="absolute left-3 top-2.5 w-4 h-4 text-[#CE1126]" />
+                  <Mail className="absolute left-3 top-2.5 w-4 h-4 text-[#CE1126]" />
                   <input
-                    type="text"
+                    type="email"
                     required
-                    placeholder="e.g. Jesse Fiagbe"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    className={`w-full pl-9 pr-3 py-2 rounded-xl text-sm transition-colors focus:outline-none focus:border-[#CE1126] border ${
+                    placeholder="Enter your registered email"
+                    value={email}
+                    onChange={(e) => {
+                      setEmail(e.target.value);
+                      if (errorMessage) setErrorMessage(null);
+                    }}
+                    className={`w-full pl-9 pr-3 py-2.5 rounded-xl text-sm transition-colors focus:outline-none focus:border-[#CE1126] border ${
                       isDark 
                         ? 'bg-slate-800 border-slate-700 text-white placeholder-slate-500 focus:bg-slate-800/90' 
                         : 'bg-slate-50 border-slate-200 text-slate-900 placeholder-slate-400 focus:bg-white'
@@ -591,71 +509,23 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLogin, onBackToWelcome }) 
                   />
                 </div>
               </div>
-            </>
-          )}
 
-          <div>
-            <label className={`block text-xs font-bold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
-              Email Address <span className="text-red-500">*</span>
-            </label>
-            <div className="relative">
-              <Mail className="absolute left-3 top-2.5 w-4 h-4 text-[#CE1126]" />
-              <input
-                type="email"
-                required
-                placeholder={isLoginView ? 'Enter your registered email' : 'e.g. student@central.edu.gh or yourname@gmail.com'}
-                value={email}
-                onChange={(e) => {
-                  setEmail(e.target.value);
-                  if (errorMessage) setErrorMessage(null);
-                }}
-                className={`w-full pl-9 pr-3 py-2 rounded-xl text-sm transition-colors focus:outline-none focus:border-[#CE1126] border ${
-                  isDark 
-                    ? 'bg-slate-800 border-slate-700 text-white placeholder-slate-500 focus:bg-slate-800/90' 
-                    : 'bg-slate-50 border-slate-200 text-slate-900 placeholder-slate-400 focus:bg-white'
-                }`}
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className={`block text-xs font-bold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
-              Password <span className="text-red-500">*</span>
-            </label>
-            <div className="relative">
-              <Lock className="absolute left-3 top-2.5 w-4 h-4 text-[#CE1126]" />
-              <input
-                type="password"
-                required
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => {
-                  setPassword(e.target.value);
-                  if (errorMessage) setErrorMessage(null);
-                }}
-                className={`w-full pl-9 pr-3 py-2 rounded-xl text-sm transition-colors focus:outline-none focus:border-[#CE1126] border ${
-                  isDark 
-                    ? 'bg-slate-800 border-slate-700 text-white placeholder-slate-500 focus:bg-slate-800/90' 
-                    : 'bg-slate-50 border-slate-200 text-slate-900 placeholder-slate-400 focus:bg-white'
-                }`}
-              />
-            </div>
-          </div>
-
-          {!isLoginView && (
-            <>
               <div>
                 <label className={`block text-xs font-bold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
-                  Phone Number (MTN / Telecel / AirtelTigo)
+                  Password <span className="text-red-500">*</span>
                 </label>
                 <div className="relative">
-                  <Phone className="absolute left-3 top-2.5 w-4 h-4 text-[#CE1126]" />
+                  <Lock className="absolute left-3 top-2.5 w-4 h-4 text-[#CE1126]" />
                   <input
-                    type="tel"
-                    placeholder="e.g. +233 24 000 0000"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    className={`w-full pl-9 pr-3 py-2 rounded-xl text-sm transition-colors focus:outline-none focus:border-[#CE1126] border ${
+                    type="password"
+                    required
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(e) => {
+                      setPassword(e.target.value);
+                      if (errorMessage) setErrorMessage(null);
+                    }}
+                    className={`w-full pl-9 pr-3 py-2.5 rounded-xl text-sm transition-colors focus:outline-none focus:border-[#CE1126] border ${
                       isDark 
                         ? 'bg-slate-800 border-slate-700 text-white placeholder-slate-500 focus:bg-slate-800/90' 
                         : 'bg-slate-50 border-slate-200 text-slate-900 placeholder-slate-400 focus:bg-white'
@@ -664,124 +534,607 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLogin, onBackToWelcome }) 
                 </div>
               </div>
 
-              <div>
-                <label className={`block text-xs font-bold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
-                  Campus Role
-                </label>
-                <div className="grid grid-cols-3 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setRole('student')}
-                    className={`py-2 px-2 text-xs font-bold rounded-xl border flex flex-col items-center gap-1 cursor-pointer transition-all ${
-                      role === 'student'
-                        ? 'bg-[#CE1126] border-[#CE1126] text-white shadow-sm'
-                        : isDark ? 'bg-slate-800 border-slate-700 text-slate-300 hover:border-[#CE1126]' : 'bg-slate-50 border-slate-200 text-slate-600 hover:border-[#CE1126]'
-                    }`}
-                  >
-                    <GraduationCap className="w-4 h-4" />
-                    <span>Student</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setRole('merchant')}
-                    className={`py-2 px-2 text-xs font-bold rounded-xl border flex flex-col items-center gap-1 cursor-pointer transition-all ${
-                      role === 'merchant'
-                        ? 'bg-[#CE1126] border-[#CE1126] text-white shadow-sm'
-                        : isDark ? 'bg-slate-800 border-slate-700 text-slate-300 hover:border-[#CE1126]' : 'bg-slate-50 border-slate-200 text-slate-600 hover:border-[#CE1126]'
-                    }`}
-                  >
-                    <Store className="w-4 h-4" />
-                    <span>Merchant</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setRole('visitor')}
-                    className={`py-2 px-2 text-xs font-bold rounded-xl border flex flex-col items-center gap-1 cursor-pointer transition-all ${
-                      role === 'visitor'
-                        ? 'bg-[#CE1126] border-[#CE1126] text-white shadow-sm'
-                        : isDark ? 'bg-slate-800 border-slate-700 text-slate-300 hover:border-[#CE1126]' : 'bg-slate-50 border-slate-200 text-slate-600 hover:border-[#CE1126]'
-                    }`}
-                  >
-                    <UserCheck className="w-4 h-4" />
-                    <span>Visitor</span>
-                  </button>
-                </div>
-              </div>
+              <button
+                type="submit"
+                disabled={loading}
+                className="btn-neon-crimson w-full mt-2 py-3.5 disabled:opacity-50 text-white font-extrabold rounded-full transition-all cursor-pointer flex items-center justify-center gap-2"
+              >
+                {loading ? (
+                  <span className="inline-flex items-center gap-2">
+                    <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <span>Verifying account...</span>
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-1.5">
+                    <span>Log In to Central Mall</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </span>
+                )}
+              </button>
+            </form>
 
-              {role === 'student' && (
-                <div>
-                  <label className={`block text-xs font-bold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
-                    Student Index Number (Optional)
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. CU-2026-9812"
-                    value={studentId}
-                    onChange={(e) => setStudentId(e.target.value)}
-                    className={`w-full px-3 py-2 rounded-xl text-sm transition-colors focus:outline-none focus:border-[#CE1126] border ${
-                      isDark 
-                        ? 'bg-slate-800 border-slate-700 text-white placeholder-slate-500 focus:bg-slate-800/90' 
-                        : 'bg-slate-50 border-slate-200 text-slate-900 placeholder-slate-400 focus:bg-white'
+            <div className="mt-5 text-center text-xs">
+              <p className={isDark ? 'text-slate-400' : 'text-slate-500'}>
+                Don't have an account yet?{' '}
+                <button
+                  type="button"
+                  onClick={handleSwitchToSignUp}
+                  className="font-bold text-[#CE1126] hover:underline cursor-pointer"
+                >
+                  Start Sign Up Wizard &rarr;
+                </button>
+              </p>
+            </div>
+          </div>
+        ) : (
+          /* --- 4-FOLD SIGN UP WIZARD --- */
+          <div>
+            {/* Header & Step Indicator */}
+            <div className="mb-5 text-center">
+              <div className="w-14 h-14 mx-auto mb-3 rounded-2xl bg-gradient-to-br from-[#ff073a] to-[#7a031a] text-white flex items-center justify-center shadow-[0_0_20px_rgba(255,7,58,0.5)] border border-[#ff3366]/40">
+                <UserPlus className="w-7 h-7" />
+              </div>
+              <h2 className={`text-2xl font-black tracking-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                Create Central Account
+              </h2>
+              <div className="flex items-center justify-center gap-1.5 mt-2">
+                {[1, 2, 3, 4].map((stepNum) => (
+                  <div
+                    key={stepNum}
+                    className={`h-1.5 rounded-full transition-all duration-300 ${
+                      signupStep === stepNum 
+                        ? 'w-8 bg-[#ff073a]' 
+                        : signupStep > stepNum 
+                        ? 'w-4 bg-emerald-500' 
+                        : isDark ? 'w-4 bg-slate-800' : 'w-4 bg-slate-200'
                     }`}
                   />
-                </div>
+                ))}
+              </div>
+              <p className={`text-xs font-semibold mt-1.5 ${isDark ? 'text-red-400' : 'text-[#CE1126]'}`}>
+                Step {signupStep} of 4: {
+                  signupStep === 1 ? 'Personal Identity' :
+                  signupStep === 2 ? 'Contact & Password' :
+                  signupStep === 3 ? 'Campus Role' : 'Profile Avatar'
+                }
+              </p>
+            </div>
+
+            <AnimatePresence mode="wait">
+              {/* FOLD 1: Name and Gender */}
+              {signupStep === 1 && (
+                <motion.div
+                  key="fold-1"
+                  initial={{ opacity: 0, x: 30 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -30 }}
+                  transition={{ duration: 0.3 }}
+                  className="space-y-4"
+                >
+                  <div>
+                    <label className={`block text-xs font-bold mb-1.5 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                      Full Name <span className="text-red-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <User className="absolute left-3.5 top-3 w-4 h-4 text-[#CE1126]" />
+                      <input
+                        type="text"
+                        required
+                        placeholder="e.g. Jesse Fiagbe"
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        className={`w-full pl-10 pr-3 py-3 rounded-xl text-sm transition-colors focus:outline-none focus:border-[#CE1126] border ${
+                          isDark 
+                            ? 'bg-slate-800 border-slate-700 text-white placeholder-slate-500 focus:bg-slate-800/90' 
+                            : 'bg-slate-50 border-slate-200 text-slate-900 placeholder-slate-400 focus:bg-white'
+                        }`}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className={`block text-xs font-bold mb-1.5 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                      Gender <span className="text-red-500">*</span> <span className="text-[10px] text-slate-400 font-normal">(Select Male or Female)</span>
+                    </label>
+                    <div className="grid grid-cols-2 gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setGender('male')}
+                        className={`py-3.5 px-4 text-xs font-extrabold rounded-2xl border flex items-center justify-center gap-2 cursor-pointer transition-all ${
+                          gender === 'male'
+                            ? 'bg-gradient-to-r from-[#ff073a] to-[#CE1126] border-[#ff073a] text-white shadow-[0_0_15px_rgba(255,7,58,0.4)] scale-[1.02]'
+                            : isDark ? 'bg-slate-800/80 border-slate-700 text-slate-300 hover:border-[#ff073a]' : 'bg-slate-50 border-slate-200 text-slate-700 hover:border-[#ff073a]'
+                        }`}
+                      >
+                        <span className="w-3.5 h-3.5 rounded-full border border-current flex items-center justify-center">
+                          {gender === 'male' && <span className="w-2 h-2 rounded-full bg-white" />}
+                        </span>
+                        <span>Male</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setGender('female')}
+                        className={`py-3.5 px-4 text-xs font-extrabold rounded-2xl border flex items-center justify-center gap-2 cursor-pointer transition-all ${
+                          gender === 'female'
+                            ? 'bg-gradient-to-r from-[#ff073a] to-[#CE1126] border-[#ff073a] text-white shadow-[0_0_15px_rgba(255,7,58,0.4)] scale-[1.02]'
+                            : isDark ? 'bg-slate-800/80 border-slate-700 text-slate-300 hover:border-[#ff073a]' : 'bg-slate-50 border-slate-200 text-slate-700 hover:border-[#ff073a]'
+                        }`}
+                      >
+                        <span className="w-3.5 h-3.5 rounded-full border border-current flex items-center justify-center">
+                          {gender === 'female' && <span className="w-2 h-2 rounded-full bg-white" />}
+                        </span>
+                        <span>Female</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="pt-2 flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={handlePrevStep}
+                      className={`flex-1 py-3 rounded-xl text-xs font-bold border transition-colors cursor-pointer ${
+                        isDark ? 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700' : 'bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200'
+                      }`}
+                    >
+                      Back
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleNextStep}
+                      className="btn-neon-crimson flex-2 py-3 rounded-xl text-xs font-extrabold flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <span>Next: Contact Details</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                </motion.div>
               )}
-            </>
-          )}
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="btn-neon-crimson w-full mt-3 py-3.5 disabled:opacity-50 text-white font-extrabold rounded-full transition-all cursor-pointer flex items-center justify-center gap-2"
-          >
-            {loading ? (
-              <span className="inline-flex items-center gap-2">
-                <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                <span>{isLoginView ? 'Verifying account...' : 'Creating your account...'}</span>
-              </span>
-            ) : (
-              <span className="flex items-center gap-1.5">
-                <span>{isLoginView ? 'Log In' : 'Sign Up & Create Account'}</span>
-                <ArrowRight className="w-4 h-4" />
-              </span>
-            )}
-          </button>
-        </form>
+              {/* FOLD 2: Phone Number, Email, and Password */}
+              {signupStep === 2 && (
+                <motion.div
+                  key="fold-2"
+                  initial={{ opacity: 0, x: 30 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -30 }}
+                  transition={{ duration: 0.3 }}
+                  className="space-y-3.5"
+                >
+                  <div>
+                    <label className={`block text-xs font-bold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                      Phone Number (MTN / Telecel / AirtelTigo)
+                    </label>
+                    <div className="relative">
+                      <Phone className="absolute left-3.5 top-3 w-4 h-4 text-[#CE1126]" />
+                      <input
+                        type="tel"
+                        placeholder="e.g. +233 24 000 0000"
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        className={`w-full pl-10 pr-3 py-3 rounded-xl text-sm transition-colors focus:outline-none focus:border-[#CE1126] border ${
+                          isDark 
+                            ? 'bg-slate-800 border-slate-700 text-white placeholder-slate-500 focus:bg-slate-800/90' 
+                            : 'bg-slate-50 border-slate-200 text-slate-900 placeholder-slate-400 focus:bg-white'
+                        }`}
+                      />
+                    </div>
+                  </div>
 
-        {/* Footer switch prompt */}
-        <div className="mt-5 text-center text-xs">
-          {isLoginView ? (
-            <p className={isDark ? 'text-slate-400' : 'text-slate-500'}>
-              Don't have an account yet?{' '}
-              <button
-                type="button"
-                onClick={handleSwitchToSignUp}
-                id="footer-switch-to-signup"
-                className="font-bold text-[#CE1126] hover:underline cursor-pointer"
-              >
-                Sign Up First &rarr;
-              </button>
-            </p>
-          ) : (
-            <p className={isDark ? 'text-slate-400' : 'text-slate-500'}>
-              Already signed up?{' '}
-              <button
-                type="button"
-                onClick={() => {
-                  setIsLoginView(true);
-                  setErrorMessage(null);
-                  setShowSignupPrompt(false);
-                  setSuccessMessage(null);
-                }}
-                id="footer-switch-to-login"
-                className="font-bold text-[#CE1126] hover:underline cursor-pointer"
-              >
-                Log In Here &rarr;
-              </button>
-            </p>
-          )}
-        </div>
+                  <div>
+                    <label className={`block text-xs font-bold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                      Email Address <span className="text-red-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <Mail className="absolute left-3.5 top-3 w-4 h-4 text-[#CE1126]" />
+                      <input
+                        type="email"
+                        required
+                        placeholder="e.g. student@central.edu.gh"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        className={`w-full pl-10 pr-3 py-3 rounded-xl text-sm transition-colors focus:outline-none focus:border-[#CE1126] border ${
+                          isDark 
+                            ? 'bg-slate-800 border-slate-700 text-white placeholder-slate-500 focus:bg-slate-800/90' 
+                            : 'bg-slate-50 border-slate-200 text-slate-900 placeholder-slate-400 focus:bg-white'
+                        }`}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className={`block text-xs font-bold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                      Password <span className="text-red-500">*</span> <span className="text-[10px] text-slate-400 font-normal">(Min 4 chars)</span>
+                    </label>
+                    <div className="relative">
+                      <Lock className="absolute left-3.5 top-3 w-4 h-4 text-[#CE1126]" />
+                      <input
+                        type="password"
+                        required
+                        placeholder="••••••••"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        className={`w-full pl-10 pr-3 py-3 rounded-xl text-sm transition-colors focus:outline-none focus:border-[#CE1126] border ${
+                          isDark 
+                            ? 'bg-slate-800 border-slate-700 text-white placeholder-slate-500 focus:bg-slate-800/90' 
+                            : 'bg-slate-50 border-slate-200 text-slate-900 placeholder-slate-400 focus:bg-white'
+                        }`}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="pt-2 flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={handlePrevStep}
+                      className={`flex-1 py-3 rounded-xl text-xs font-bold border transition-colors cursor-pointer ${
+                        isDark ? 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700' : 'bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200'
+                      }`}
+                    >
+                      Back
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleNextStep}
+                      className="btn-neon-crimson flex-2 py-3 rounded-xl text-xs font-extrabold flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <span>Next: Campus Role</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+
+              {/* FOLD 3: Campus Role Horizontal Radio List with SVGs */}
+              {signupStep === 3 && (
+                <motion.div
+                  key="fold-3"
+                  initial={{ opacity: 0, x: 30 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -30 }}
+                  transition={{ duration: 0.3 }}
+                  className="space-y-4"
+                >
+                  <label className={`block text-xs font-bold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                    Select Your Campus Role <span className="text-red-500">*</span>
+                  </label>
+
+                  {/* Horizontal Radio List with SVG icons */}
+                  <div className="grid grid-cols-1 gap-2.5">
+                    {/* Student Option */}
+                    <div
+                      onClick={() => setRole('student')}
+                      className={`flex items-center justify-between p-3.5 rounded-2xl border-2 cursor-pointer transition-all ${
+                        role === 'student'
+                          ? 'border-[#ff073a] bg-gradient-to-r from-red-950/40 to-transparent shadow-[0_0_15px_rgba(255,7,58,0.2)]'
+                          : isDark ? 'border-slate-800 bg-slate-800/50 hover:border-slate-700' : 'border-slate-200 bg-slate-50 hover:border-slate-300'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className={`w-11 h-11 rounded-xl flex items-center justify-center ${
+                          role === 'student' ? 'bg-[#ff073a] text-white shadow-md' : isDark ? 'bg-slate-700 text-red-400' : 'bg-red-100 text-[#CE1126]'
+                        }`}>
+                          <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 14l9-5-9-5-9 5 9 5z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 14l6.16-3.422a12.083 12.083 0.011.665-6.16 3.422z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 19v-4.5a3 3 0 013-3h8a3 3 0 013 3V19" />
+                          </svg>
+                        </div>
+                        <div>
+                          <p className={`text-sm font-extrabold ${isDark ? 'text-white' : 'text-slate-900'}`}>Student</p>
+                          <p className="text-[11px] text-slate-400">Access campus GPS, Marketplace & AI tutor</p>
+                        </div>
+                      </div>
+                      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                        role === 'student' ? 'border-[#ff073a] bg-[#ff073a]' : 'border-slate-500'
+                      }`}>
+                        {role === 'student' && <span className="w-2 h-2 rounded-full bg-white" />}
+                      </div>
+                    </div>
+
+                    {/* Merchant Option */}
+                    <div
+                      onClick={() => setRole('merchant')}
+                      className={`flex items-center justify-between p-3.5 rounded-2xl border-2 cursor-pointer transition-all ${
+                        role === 'merchant'
+                          ? 'border-[#ff073a] bg-gradient-to-r from-red-950/40 to-transparent shadow-[0_0_15px_rgba(255,7,58,0.2)]'
+                          : isDark ? 'border-slate-800 bg-slate-800/50 hover:border-slate-700' : 'border-slate-200 bg-slate-50 hover:border-slate-300'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className={`w-11 h-11 rounded-xl flex items-center justify-center ${
+                          role === 'merchant' ? 'bg-[#ff073a] text-white shadow-md' : isDark ? 'bg-slate-700 text-red-400' : 'bg-red-100 text-[#CE1126]'
+                        }`}>
+                          <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                          </svg>
+                        </div>
+                        <div>
+                          <p className={`text-sm font-extrabold ${isDark ? 'text-white' : 'text-slate-900'}`}>Merchant / Vendor</p>
+                          <p className="text-[11px] text-slate-400">List products, manage orders & boost sales</p>
+                        </div>
+                      </div>
+                      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                        role === 'merchant' ? 'border-[#ff073a] bg-[#ff073a]' : 'border-slate-500'
+                      }`}>
+                        {role === 'merchant' && <span className="w-2 h-2 rounded-full bg-white" />}
+                      </div>
+                    </div>
+
+                    {/* Visitor Option */}
+                    <div
+                      onClick={() => setRole('visitor')}
+                      className={`flex items-center justify-between p-3.5 rounded-2xl border-2 cursor-pointer transition-all ${
+                        role === 'visitor'
+                          ? 'border-[#ff073a] bg-gradient-to-r from-red-950/40 to-transparent shadow-[0_0_15px_rgba(255,7,58,0.2)]'
+                          : isDark ? 'border-slate-800 bg-slate-800/50 hover:border-slate-700' : 'border-slate-200 bg-slate-50 hover:border-slate-300'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className={`w-11 h-11 rounded-xl flex items-center justify-center ${
+                          role === 'visitor' ? 'bg-[#ff073a] text-white shadow-md' : isDark ? 'bg-slate-700 text-red-400' : 'bg-red-100 text-[#CE1126]'
+                        }`}>
+                          <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                          </svg>
+                        </div>
+                        <div>
+                          <p className={`text-sm font-extrabold ${isDark ? 'text-white' : 'text-slate-900'}`}>Visitor / Guest</p>
+                          <p className="text-[11px] text-slate-400">Explore campus landmarks & school info</p>
+                        </div>
+                      </div>
+                      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                        role === 'visitor' ? 'border-[#ff073a] bg-[#ff073a]' : 'border-slate-500'
+                      }`}>
+                        {role === 'visitor' && <span className="w-2 h-2 rounded-full bg-white" />}
+                      </div>
+                    </div>
+                  </div>
+
+                  {role === 'student' && (
+                    <div className="mt-2">
+                      <label className={`block text-xs font-bold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                        Student Index Number (Optional)
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. CU-2026-9812"
+                        value={studentId}
+                        onChange={(e) => setStudentId(e.target.value)}
+                        className={`w-full px-3.5 py-2.5 rounded-xl text-sm transition-colors focus:outline-none focus:border-[#CE1126] border ${
+                          isDark 
+                            ? 'bg-slate-800 border-slate-700 text-white placeholder-slate-500 focus:bg-slate-800/90' 
+                            : 'bg-slate-50 border-slate-200 text-slate-900 placeholder-slate-400 focus:bg-white'
+                        }`}
+                      />
+                    </div>
+                  )}
+
+                  <div className="pt-2 flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={handlePrevStep}
+                      className={`flex-1 py-3 rounded-xl text-xs font-bold border transition-colors cursor-pointer ${
+                        isDark ? 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700' : 'bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200'
+                      }`}
+                    >
+                      Back
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleNextStep}
+                      className="btn-neon-crimson flex-2 py-3 rounded-xl text-xs font-extrabold flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <span>Next: Profile Avatar</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+
+              {/* FOLD 4: Profile Picture Import & Avatar Selection */}
+              {signupStep === 4 && (
+                <motion.div
+                  key="fold-4"
+                  initial={{ opacity: 0, x: 30 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -30 }}
+                  transition={{ duration: 0.3 }}
+                  className="space-y-4"
+                >
+                  <div className="text-center">
+                    <h3 className={`text-sm font-bold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>
+                      Profile Picture & SVG Avatars
+                    </h3>
+                    <p className="text-[11px] text-slate-400 mt-0.5">
+                      Upload your own photo or choose from our exclusive SVG profile collection
+                    </p>
+                  </div>
+
+                  <div className="flex flex-col items-center justify-center py-2">
+                    <div className={`relative w-24 h-24 rounded-3xl border-2 overflow-hidden flex items-center justify-center shadow-lg ${
+                      isDark ? 'bg-slate-800/90 border-[#ff073a]/50' : 'bg-slate-100 border-red-300'
+                    }`}>
+                      {avatarPreview ? (
+                        <img
+                          src={avatarPreview}
+                          alt="Avatar Preview"
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="flex flex-col items-center justify-center text-slate-400 p-2 text-center">
+                          <Sparkles className="w-8 h-8 text-[#ff073a] mb-1 animate-pulse" />
+                          <span className="text-[10px] font-bold">Auto-Randomized if left blank</span>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex flex-wrap items-center justify-center gap-2.5 mt-4">
+                      {/* Select Avatar Button */}
+                      <button
+                        type="button"
+                        onClick={() => setIsAvatarModalOpen(true)}
+                        className={`inline-flex items-center gap-1.5 text-xs font-extrabold px-4 py-2.5 rounded-xl cursor-pointer transition-all shadow-md border ${
+                          isDark 
+                            ? 'bg-[#ff073a]/20 hover:bg-[#ff073a]/30 border-[#ff073a] text-red-300' 
+                            : 'bg-red-50 hover:bg-red-100 border-red-300 text-[#CE1126]'
+                        }`}
+                      >
+                        <Sparkles className="w-4 h-4 text-[#ff073a]" />
+                        <span>Select Avatar</span>
+                      </button>
+
+                      {/* Upload Picture Button */}
+                      <label className={`inline-flex items-center gap-1.5 text-xs font-bold px-4 py-2.5 rounded-xl cursor-pointer transition-colors shadow-sm border ${
+                        isDark 
+                          ? 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-200' 
+                          : 'bg-slate-100 hover:bg-slate-200 border-slate-300 text-slate-700'
+                      }`}>
+                        <Upload className="w-4 h-4" />
+                        <span>Upload Custom Photo</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleImageFileChange}
+                          className="hidden"
+                        />
+                      </label>
+                    </div>
+                  </div>
+
+                  <form onSubmit={handleFinalSignupSubmit} className="space-y-3">
+                    <div className="pt-2 flex items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={handlePrevStep}
+                        className={`flex-1 py-3 rounded-xl text-xs font-bold border transition-colors cursor-pointer ${
+                          isDark ? 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700' : 'bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200'
+                        }`}
+                      >
+                        Back
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={loading}
+                        className="btn-neon-crimson flex-2 py-3 rounded-xl text-xs font-extrabold flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 shadow-[0_0_20px_rgba(255,7,58,0.5)]"
+                      >
+                        {loading ? (
+                          <span className="inline-flex items-center gap-2">
+                            <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                            <span>Creating account...</span>
+                          </span>
+                        ) : (
+                          <span className="flex items-center gap-1.5">
+                            <span>Enter Central Mall &rarr;</span>
+                          </span>
+                        )}
+                      </button>
+                    </div>
+                  </form>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            <div className="mt-5 text-center text-xs">
+              <p className={isDark ? 'text-slate-400' : 'text-slate-500'}>
+                Already have an account?{' '}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsLoginView(true);
+                    setErrorMessage(null);
+                    setShowSignupPrompt(false);
+                    setSuccessMessage(null);
+                  }}
+                  className="font-bold text-[#CE1126] hover:underline cursor-pointer"
+                >
+                  Log In Here &rarr;
+                </button>
+              </p>
+            </div>
+          </div>
+        )}
       </motion.div>
+
+      {/* --- AVATAR SELECTION POPUP MODAL --- */}
+      <AnimatePresence>
+        {isAvatarModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className={`w-full max-w-lg rounded-3xl p-6 border shadow-2xl relative max-h-[90vh] overflow-y-auto ${
+                isDark 
+                  ? 'bg-[#0f172a] border-[#ff073a]/40 text-slate-100 shadow-[0_0_50px_rgba(255,7,58,0.25)]' 
+                  : 'bg-white border-red-200 text-slate-900 shadow-xl'
+              }`}
+            >
+              <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-700/40">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-xl bg-[#ff073a] text-white flex items-center justify-center">
+                    <Sparkles className="w-4 h-4" />
+                  </div>
+                  <h3 className="text-base font-black">Choose Your SVG Avatar</h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsAvatarModalOpen(false)}
+                  className={`p-2 rounded-xl transition-colors cursor-pointer ${
+                    isDark ? 'hover:bg-slate-800 text-slate-400' : 'hover:bg-slate-100 text-slate-600'
+                  }`}
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <p className="text-xs text-slate-400 mb-4">
+                Click on any SVG profile avatar below to instantly fix it as your profile image.
+              </p>
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3.5">
+                {AVATAR_PROFILES.map((prof) => {
+                  const dataUri = svgToDataUri(prof.svg);
+                  const isSelected = avatarPreview === dataUri;
+                  return (
+                    <div
+                      key={prof.id}
+                      onClick={() => {
+                        setAvatarPreview(dataUri);
+                        setIsAvatarModalOpen(false);
+                      }}
+                      className={`group relative p-3 rounded-2xl border-2 flex flex-col items-center gap-2 cursor-pointer transition-all ${
+                        isSelected
+                          ? 'border-[#ff073a] bg-[#ff073a]/10 shadow-[0_0_15px_rgba(255,7,58,0.3)] scale-105'
+                          : isDark ? 'border-slate-800 bg-slate-900/80 hover:border-[#ff073a]/60 hover:bg-slate-800' : 'border-slate-200 bg-slate-50 hover:border-red-300 hover:bg-red-50/50'
+                      }`}
+                    >
+                      <div className="w-16 h-16 rounded-2xl overflow-hidden flex items-center justify-center shadow-md bg-slate-800/20 p-1">
+                        <img src={dataUri} alt={prof.name} className="w-full h-full object-contain" />
+                      </div>
+                      <span className={`text-xs font-bold text-center truncate w-full ${
+                        isDark ? 'text-slate-200' : 'text-slate-800'
+                      }`}>
+                        {prof.name}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="mt-6 pt-3 border-t border-gray-700/40 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setIsAvatarModalOpen(false)}
+                  className="btn-neon-crimson px-5 py-2.5 rounded-xl text-xs font-bold cursor-pointer"
+                >
+                  Done
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

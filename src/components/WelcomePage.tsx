@@ -20,21 +20,8 @@ export const WelcomePage: React.FC<WelcomePageProps> = ({ onEnter }) => {
       />
       <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm z-[-1]" />
 
-      {/* Top Bar with Header Badge, PWA Download Button & Theme Switcher */}
-      <div className="w-full max-w-4xl flex items-center justify-between">
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-          className="flex items-center gap-2 px-4 py-2 rounded-full backdrop-blur-md shadow-lg border border-[#ff073a]/40 bg-[#06101e]/90 text-slate-100 shadow-[0_0_20px_rgba(255,7,58,0.2)]"
-        >
-          <span className="w-2.5 h-2.5 rounded-full bg-[#ff073a] shadow-[0_0_10px_#ff073a] animate-pulse" />
-          <span className="text-xs md:text-sm font-extrabold tracking-wider text-rose-300 uppercase">
-            Central University • Miotso Main Campus
-          </span>
-          <span className="text-[#D4AF37] text-xs">✦</span>
-        </motion.div>
-
+      {/* Top Bar with PWA Download Button & Theme Switcher (Pill bar removed from top as requested) */}
+      <div className="w-full max-w-4xl flex items-center justify-end">
         {/* Top Controls: PWA App Download & Theme Toggle Button */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
@@ -45,8 +32,8 @@ export const WelcomePage: React.FC<WelcomePageProps> = ({ onEnter }) => {
           <button
             onClick={() => window.dispatchEvent(new CustomEvent('open-pwa-install'))}
             id="welcome-pwa-install-btn"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-[#ff073a]/20 hover:bg-[#ff073a]/30 text-rose-200 border border-[#ff073a]/50 shadow-[0_0_15px_rgba(255,7,58,0.3)] transition-all cursor-pointer"
-            title="Download & Install Central Mall PWA (PAW) App"
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-bold bg-[#ff073a]/20 hover:bg-[#ff073a]/30 text-rose-200 border border-[#ff073a]/50 shadow-[0_0_15px_rgba(255,7,58,0.3)] transition-all cursor-pointer"
+            title="Download & Install Central Mall PWA App"
           >
             <Smartphone className="w-3.5 h-3.5 text-[#ff073a]" />
             <span className="hidden sm:inline">PWA App</span>
@@ -79,6 +66,16 @@ export const WelcomePage: React.FC<WelcomePageProps> = ({ onEnter }) => {
         >
           Welcome to <span className="neon-crimson-text">Central Mall</span>
         </motion.h1>
+
+        {/* Centered text below Welcome to Central Mall, before Faith Integrity Excellence, without the pill */}
+        <motion.p
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.33 }}
+          className="text-sm md:text-base font-extrabold tracking-wide text-rose-300 uppercase mb-3"
+        >
+          Central University • Miotso Main Campus
+        </motion.p>
 
         <motion.div
           initial={{ opacity: 0 }}
@@ -186,7 +183,7 @@ export const WelcomePage: React.FC<WelcomePageProps> = ({ onEnter }) => {
           onClick={() => window.dispatchEvent(new CustomEvent('open-pwa-install'))}
           className="flex items-center gap-1 hover:text-white text-[#ff073a] transition-colors cursor-pointer"
         >
-          <Smartphone className="w-3.5 h-3.5" /> Install Central Mall PWA (PAW)
+          <Smartphone className="w-3.5 h-3.5" /> Install Central Mall PWA App
         </button>
         <span className="flex items-center gap-1">
           <Sparkles className="w-3.5 h-3.5 text-[#CE1126]" /> Powered by Central AI
@@ -195,3 +192,5 @@ export const WelcomePage: React.FC<WelcomePageProps> = ({ onEnter }) => {
     </div>
   );
 };
+
+export default WelcomePage;
