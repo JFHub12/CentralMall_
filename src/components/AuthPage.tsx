@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   User, LogIn, UserPlus, ArrowLeft, Shield, Mail, Lock, Phone, 
-  GraduationCap, Store, UserCheck, AlertCircle, CheckCircle2, Camera, Upload, ArrowRight, Sparkles, X
+  GraduationCap, Store, UserCheck, AlertCircle, CheckCircle2, Camera, Upload, ArrowRight, Sparkles, X, Check, RefreshCw
 } from 'lucide-react';
 import { User as UserType } from '../types';
 import { useTheme, ThemeToggle } from '../context/ThemeContext';
@@ -56,7 +56,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLogin, onBackToWelcome }) 
     } catch {
       // ignore
     }
-    return false; // Default to Sign Up for first users!
+    return false;
   });
 
   // 4-Fold Sign Up Wizard Step (1, 2, 3, 4)
@@ -69,8 +69,16 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLogin, onBackToWelcome }) 
   const [phone, setPhone] = useState('');
   const [role, setRole] = useState<'student' | 'merchant' | 'visitor'>('student');
   const [studentId, setStudentId] = useState('');
-  const [gender, setGender] = useState<'male' | 'female'>('male'); // Restricted to Male and Female
+  const [gender, setGender] = useState<'male' | 'female'>('male');
   const [avatarPreview, setAvatarPreview] = useState<string>('');
+
+  // Merchant Verification State (OTP & 100 Cedis Payment)
+  const [generatedOtp, setGeneratedOtp] = useState<string>('');
+  const [enteredOtp, setEnteredOtp] = useState<string>('');
+  const [otpVerified, setOtpVerified] = useState<boolean>(false);
+  const [merchantPaid, setMerchantPaid] = useState<boolean>(false);
+  const [merchantMomo, setMerchantMomo] = useState<string>('');
+  const [smsToast, setSmsToast] = useState<string | null>(null);
 
   // Avatar Selector Modal State
   const [isAvatarModalOpen, setIsAvatarModalOpen] = useState(false);
@@ -155,6 +163,20 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLogin, onBackToWelcome }) 
         setErrorMessage('Please select your campus role.');
         return;
       }
+      // Student rule: Student Index Number is compulsory!
+      if (role === 'student') {
+        if (!studentId.trim()) {
+          setErrorMessage('Student Index Number is compulsory for students. Please provide your student index number to proceed.');
+          return;
+        }
+      }
+      // Merchant rule: Generate OTP when entering Step 4
+      if (role === 'merchant') {
+        const randomCode = Math.floor(100000 + Math.random() * 900000).toString();
+        setGeneratedOtp(randomCode);
+        setSmsToast(`[CentralMall SMS] Your verification OTP is ${randomCode}`);
+        setTimeout(() => setSmsToast(null), 8000);
+      }
     }
     setSignupStep(prev => Math.min(prev + 1, 4));
   };
@@ -166,6 +188,15 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLogin, onBackToWelcome }) 
     } else {
       onBackToWelcome();
     }
+  };
+
+  const handleResendOtp = () => {
+    const randomCode = Math.floor(100000 + Math.random() * 900000).toString();
+    setGeneratedOtp(randomCode);
+    setEnteredOtp('');
+    setOtpVerified(false);
+    setSmsToast(`[CentralMall SMS] Your new verification OTP code is ${randomCode}`);
+    setTimeout(() => setSmsToast(null), 8000);
   };
 
   const handleSubmitLogin = async (e: React.FormEvent) => {
@@ -250,6 +281,25 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLogin, onBackToWelcome }) 
     e.preventDefault();
     setErrorMessage(null);
     setSuccessMessage(null);
+
+    // Validate student rule again
+    if (role === 'student' && !studentId.trim()) {
+      setErrorMessage('Student Index Number is compulsory for students.');
+      return;
+    }
+
+    // Validate merchant rules: OTP verification & GH₵ 100 payment verification
+    if (role === 'merchant') {
+      if (!enteredOtp.trim() || enteredOtp.trim() !== generatedOtp) {
+        setErrorMessage('Please enter the correct 6-digit OTP code sent via SMS from CentralMall.');
+        return;
+      }
+      if (!merchantPaid) {
+        setErrorMessage('Please complete the GH₵ 100 vendor registration payment to activate your merchant store.');
+        return;
+      }
+    }
+
     setLoading(true);
 
     const cleanEmail = email.trim().toLowerCase();
@@ -261,7 +311,6 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLogin, onBackToWelcome }) 
       let serverRes: Response | null = null;
       let serverData: any = null;
 
-      // Decommission all Unsplash fallbacks. If blank, pick a random avatar from AVATAR_PROFILES.
       const finalAvatar = avatarPreview || getRandomAvatarDataUri();
 
       try {
@@ -274,8 +323,8 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLogin, onBackToWelcome }) 
             password: cleanPassword,
             role,
             gender,
-            phone: phone.trim() || undefined,
-            studentId: role === 'student' ? (studentId.trim() || `CU-2026-${Math.floor(1000 + Math.random() * 9000)}`) : undefined,
+            phone: phone.trim() || merchantMomo || undefined,
+            studentId: role === 'student' ? studentId.trim() : undefined,
             avatar: finalAvatar,
           }),
         });
@@ -299,8 +348,8 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLogin, onBackToWelcome }) 
           email: cleanEmail,
           role,
           gender,
-          studentId: role === 'student' ? (studentId.trim() || `CU-2026-${Math.floor(1000 + Math.random() * 9000)}`) : undefined,
-          phone: phone.trim() || undefined,
+          studentId: role === 'student' ? studentId.trim() : undefined,
+          phone: phone.trim() || merchantMomo || undefined,
           avatar: finalAvatar,
         };
       }
@@ -314,7 +363,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLogin, onBackToWelcome }) 
           role: registeredUser.role as any,
           gender,
           studentId: registeredUser.studentId,
-          phone: phone.trim(),
+          phone: registeredUser.phone,
           avatar: finalAvatar,
         });
 
@@ -363,6 +412,32 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLogin, onBackToWelcome }) 
           </div>
         </div>
       </div>
+
+      {/* Simulated CentralMall SMS Banner for Merchant OTP */}
+      <AnimatePresence>
+        {smsToast && (
+          <motion.div
+            initial={{ opacity: 0, y: -20, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -20, scale: 0.95 }}
+            className="fixed top-4 z-50 max-w-sm w-full mx-4 bg-[#002147] border-2 border-[#ff073a] text-white p-4 rounded-2xl shadow-2xl shadow-red-900/40 flex items-start gap-3"
+          >
+            <div className="w-10 h-10 rounded-xl bg-[#ff073a] text-white flex items-center justify-center shrink-0">
+              <Sparkles className="w-5 h-5" />
+            </div>
+            <div className="flex-1">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-black uppercase text-rose-300">CentralMall SMS Alert</span>
+                <span className="text-[10px] text-slate-400">Just now</span>
+              </div>
+              <p className="text-xs font-semibold mt-1 text-slate-100">{smsToast}</p>
+            </div>
+            <button onClick={() => setSmsToast(null)} className="text-slate-400 hover:text-white">
+              <X className="w-4 h-4" />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Auth Card Container */}
       <motion.div
@@ -495,7 +570,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLogin, onBackToWelcome }) 
                   <input
                     type="email"
                     required
-                    placeholder="Enter your registered email"
+                    placeholder="someone@gmail.com"
                     value={email}
                     onChange={(e) => {
                       setEmail(e.target.value);
@@ -595,7 +670,8 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLogin, onBackToWelcome }) 
                 Step {signupStep} of 4: {
                   signupStep === 1 ? 'Personal Identity' :
                   signupStep === 2 ? 'Contact & Password' :
-                  signupStep === 3 ? 'Campus Role' : 'Profile Avatar'
+                  signupStep === 3 ? 'Campus Role & ID' : 
+                  role === 'merchant' ? 'Vendor OTP & 100 Cedis Fee' : 'Profile Avatar'
                 }
               </p>
             </div>
@@ -730,7 +806,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLogin, onBackToWelcome }) 
                       <input
                         type="email"
                         required
-                        placeholder="e.g. student@central.edu.gh"
+                        placeholder="someone@gmail.com"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         className={`w-full pl-10 pr-3 py-3 rounded-xl text-sm transition-colors focus:outline-none focus:border-[#CE1126] border ${
@@ -785,7 +861,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLogin, onBackToWelcome }) 
                 </motion.div>
               )}
 
-              {/* FOLD 3: Campus Role Horizontal Radio List with SVGs */}
+              {/* FOLD 3: Campus Role Horizontal Radio List with SVGs & Compulsory Student ID */}
               {signupStep === 3 && (
                 <motion.div
                   key="fold-3"
@@ -822,7 +898,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLogin, onBackToWelcome }) 
                         </div>
                         <div>
                           <p className={`text-sm font-extrabold ${isDark ? 'text-white' : 'text-slate-900'}`}>Student</p>
-                          <p className="text-[11px] text-slate-400">Access campus GPS, Marketplace & AI tutor</p>
+                          <p className="text-[11px] text-slate-400">Buy items only (Student ID compulsory)</p>
                         </div>
                       </div>
                       <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
@@ -851,7 +927,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLogin, onBackToWelcome }) 
                         </div>
                         <div>
                           <p className={`text-sm font-extrabold ${isDark ? 'text-white' : 'text-slate-900'}`}>Merchant / Vendor</p>
-                          <p className="text-[11px] text-slate-400">List products, manage orders & boost sales</p>
+                          <p className="text-[11px] text-slate-400">SMS OTP & GH₵ 100 fee (Can list & sell items)</p>
                         </div>
                       </div>
                       <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
@@ -880,7 +956,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLogin, onBackToWelcome }) 
                         </div>
                         <div>
                           <p className={`text-sm font-extrabold ${isDark ? 'text-white' : 'text-slate-900'}`}>Visitor / Guest</p>
-                          <p className="text-[11px] text-slate-400">Explore campus landmarks & school info</p>
+                          <p className="text-[11px] text-slate-400">Explore campus & buy only (No selling)</p>
                         </div>
                       </div>
                       <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
@@ -892,21 +968,23 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLogin, onBackToWelcome }) 
                   </div>
 
                   {role === 'student' && (
-                    <div className="mt-2">
-                      <label className={`block text-xs font-bold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
-                        Student Index Number (Optional)
+                    <div className="mt-3 p-3.5 rounded-2xl bg-red-950/20 border border-red-500/30">
+                      <label className={`block text-xs font-bold mb-1 ${isDark ? 'text-red-300' : 'text-[#CE1126]'}`}>
+                        Student Index Number <span className="text-red-500">* (Compulsory)</span>
                       </label>
                       <input
                         type="text"
+                        required
                         placeholder="e.g. CU-2026-9812"
                         value={studentId}
                         onChange={(e) => setStudentId(e.target.value)}
                         className={`w-full px-3.5 py-2.5 rounded-xl text-sm transition-colors focus:outline-none focus:border-[#CE1126] border ${
                           isDark 
-                            ? 'bg-slate-800 border-slate-700 text-white placeholder-slate-500 focus:bg-slate-800/90' 
-                            : 'bg-slate-50 border-slate-200 text-slate-900 placeholder-slate-400 focus:bg-white'
+                            ? 'bg-slate-800 border-red-500/50 text-white placeholder-slate-500' 
+                            : 'bg-white border-red-300 text-slate-900 placeholder-slate-400'
                         }`}
                       />
+                      <p className="text-[10px] text-slate-400 mt-1">Compulsory: You cannot enter the website without providing your student index number.</p>
                     </div>
                   )}
 
@@ -925,14 +1003,14 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLogin, onBackToWelcome }) 
                       onClick={handleNextStep}
                       className="btn-neon-crimson flex-2 py-3 rounded-xl text-xs font-extrabold flex items-center justify-center gap-1.5 cursor-pointer"
                     >
-                      <span>Next: Profile Avatar</span>
+                      <span>Next: {role === 'merchant' ? 'Vendor SMS & Fee' : 'Profile Avatar'}</span>
                       <ArrowRight className="w-4 h-4" />
                     </button>
                   </div>
                 </motion.div>
               )}
 
-              {/* FOLD 4: Profile Picture Import & Avatar Selection */}
+              {/* FOLD 4: Profile Picture / Avatar & Merchant SMS OTP + GH₵ 100 Fee Verification */}
               {signupStep === 4 && (
                 <motion.div
                   key="fold-4"
@@ -942,65 +1020,161 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLogin, onBackToWelcome }) 
                   transition={{ duration: 0.3 }}
                   className="space-y-4"
                 >
-                  <div className="text-center">
-                    <h3 className={`text-sm font-bold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>
-                      Profile Picture & SVG Avatars
-                    </h3>
-                    <p className="text-[11px] text-slate-400 mt-0.5">
-                      Upload your own photo or choose from our exclusive SVG profile collection
-                    </p>
-                  </div>
-
-                  <div className="flex flex-col items-center justify-center py-2">
-                    <div className={`relative w-24 h-24 rounded-3xl border-2 overflow-hidden flex items-center justify-center shadow-lg ${
-                      isDark ? 'bg-slate-800/90 border-[#ff073a]/50' : 'bg-slate-100 border-red-300'
-                    }`}>
-                      {avatarPreview ? (
-                        <img
-                          src={avatarPreview}
-                          alt="Avatar Preview"
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div className="flex flex-col items-center justify-center text-slate-400 p-2 text-center">
-                          <Sparkles className="w-8 h-8 text-[#ff073a] mb-1 animate-pulse" />
-                          <span className="text-[10px] font-bold">Auto-Randomized if left blank</span>
+                  {role === 'merchant' ? (
+                    /* Merchant Verification: SMS OTP (CentralMall) & GH₵ 100 Fee */
+                    <div className="space-y-4">
+                      <div className="p-3.5 rounded-2xl bg-[#002147]/60 border border-[#ff073a]/40 text-left">
+                        <div className="flex items-center gap-2 mb-1 text-rose-300 font-bold text-xs">
+                          <Shield className="w-4 h-4 text-[#ff073a]" />
+                          <span>CentralMall Vendor Verification</span>
                         </div>
-                      )}
-                    </div>
+                        <p className="text-[11px] text-slate-300 leading-relaxed">
+                          A 6-digit OTP code has been sent via SMS from <strong>CentralMall</strong> to your phone number. Enter the code and pay the GH₵ 100 vendor registration fee to activate your merchant store.
+                        </p>
+                      </div>
 
-                    <div className="flex flex-wrap items-center justify-center gap-2.5 mt-4">
-                      {/* Select Avatar Button */}
-                      <button
-                        type="button"
-                        onClick={() => setIsAvatarModalOpen(true)}
-                        className={`inline-flex items-center gap-1.5 text-xs font-extrabold px-4 py-2.5 rounded-xl cursor-pointer transition-all shadow-md border ${
-                          isDark 
-                            ? 'bg-[#ff073a]/20 hover:bg-[#ff073a]/30 border-[#ff073a] text-red-300' 
-                            : 'bg-red-50 hover:bg-red-100 border-red-300 text-[#CE1126]'
-                        }`}
-                      >
-                        <Sparkles className="w-4 h-4 text-[#ff073a]" />
-                        <span>Select Avatar</span>
-                      </button>
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className={`block text-xs font-bold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                            Enter 6-Digit SMS OTP Code <span className="text-red-500">*</span>
+                          </label>
+                          <button
+                            type="button"
+                            onClick={handleResendOtp}
+                            className="text-[11px] font-bold text-[#ff073a] hover:underline cursor-pointer flex items-center gap-1"
+                          >
+                            <RefreshCw className="w-3 h-3" />
+                            <span>Resend OTS</span>
+                          </button>
+                        </div>
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            maxLength={6}
+                            placeholder="e.g. 482910"
+                            value={enteredOtp}
+                            onChange={(e) => setEnteredOtp(e.target.value)}
+                            className={`flex-1 px-3.5 py-2.5 rounded-xl text-sm font-mono tracking-widest text-center transition-colors focus:outline-none focus:border-[#CE1126] border ${
+                              isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200 text-slate-900'
+                            }`}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (enteredOtp.trim() === generatedOtp) {
+                                setOtpVerified(true);
+                                setErrorMessage(null);
+                              } else {
+                                setErrorMessage('Invalid OTP code. Please check your SMS banner.');
+                              }
+                            }}
+                            className={`px-4 py-2.5 rounded-xl text-xs font-bold cursor-pointer transition-colors ${
+                              otpVerified ? 'bg-emerald-600 text-white' : 'bg-[#ff073a] hover:bg-[#e0142b] text-white'
+                            }`}
+                          >
+                            {otpVerified ? 'Verified ✓' : 'Verify OTP'}
+                          </button>
+                        </div>
+                      </div>
 
-                      {/* Upload Picture Button */}
-                      <label className={`inline-flex items-center gap-1.5 text-xs font-bold px-4 py-2.5 rounded-xl cursor-pointer transition-colors shadow-sm border ${
-                        isDark 
-                          ? 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-200' 
-                          : 'bg-slate-100 hover:bg-slate-200 border-slate-300 text-slate-700'
-                      }`}>
-                        <Upload className="w-4 h-4" />
-                        <span>Upload Custom Photo</span>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={handleImageFileChange}
-                          className="hidden"
-                        />
-                      </label>
+                      <div className="p-3.5 rounded-2xl border bg-amber-950/20 border-amber-500/30">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs font-bold text-amber-300">Vendor Registration Fee</span>
+                          <span className="text-sm font-black text-white font-mono">GH₵ 100.00</span>
+                        </div>
+                        <div className="space-y-2">
+                          <input
+                            type="tel"
+                            placeholder="Momo Number (e.g. 0240000000)"
+                            value={merchantMomo}
+                            onChange={(e) => setMerchantMomo(e.target.value)}
+                            className={`w-full px-3 py-2 rounded-xl text-xs border ${
+                              isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-900'
+                            }`}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (!merchantMomo.trim()) {
+                                setErrorMessage('Please enter your Momo number to pay the 100 cedis fee.');
+                                return;
+                              }
+                              setMerchantPaid(true);
+                              setErrorMessage(null);
+                            }}
+                            className={`w-full py-2.5 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
+                              merchantPaid 
+                                ? 'bg-emerald-600 text-white shadow-md' 
+                                : 'bg-gradient-to-r from-amber-500 to-[#CE1126] text-white shadow-md hover:opacity-95'
+                            }`}
+                          >
+                            {merchantPaid ? 'GH₵ 100 Paid Successfully ✓' : 'Pay GH₵ 100 via Mobile Money'}
+                          </button>
+                        </div>
+                      </div>
                     </div>
-                  </div>
+                  ) : (
+                    /* Standard Profile Picture / Avatar Step for Student & Visitor */
+                    <div>
+                      <div className="text-center">
+                        <h3 className={`text-sm font-bold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>
+                          Profile Picture & SVG Avatars
+                        </h3>
+                        <p className="text-[11px] text-slate-400 mt-0.5">
+                          Choose an exclusive SVG profile or upload your own photo
+                        </p>
+                      </div>
+
+                      <div className="flex flex-col items-center justify-center py-2">
+                        <div className={`relative w-24 h-24 rounded-3xl border-2 overflow-hidden flex items-center justify-center shadow-lg ${
+                          isDark ? 'bg-slate-800/90 border-[#ff073a]/50' : 'bg-slate-100 border-red-300'
+                        }`}>
+                          {avatarPreview ? (
+                            <img
+                              src={avatarPreview}
+                              alt="Avatar Preview"
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <div className="flex flex-col items-center justify-center text-slate-400 p-2 text-center">
+                              <Sparkles className="w-8 h-8 text-[#ff073a] mb-1 animate-pulse" />
+                              <span className="text-[10px] font-bold">Auto-Randomized if left blank</span>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="flex flex-wrap items-center justify-center gap-2.5 mt-4">
+                          <button
+                            type="button"
+                            onClick={() => setIsAvatarModalOpen(true)}
+                            className={`inline-flex items-center gap-1.5 text-xs font-extrabold px-4 py-2.5 rounded-xl cursor-pointer transition-all shadow-md border ${
+                              isDark 
+                                ? 'bg-[#ff073a]/20 hover:bg-[#ff073a]/30 border-[#ff073a] text-red-300' 
+                                : 'bg-red-50 hover:bg-red-100 border-red-300 text-[#CE1126]'
+                            }`}
+                          >
+                            <Sparkles className="w-4 h-4 text-[#ff073a]" />
+                            <span>Select Avatar</span>
+                          </button>
+
+                          <label className={`inline-flex items-center gap-1.5 text-xs font-bold px-4 py-2.5 rounded-xl cursor-pointer transition-colors shadow-sm border ${
+                            isDark 
+                              ? 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-200' 
+                              : 'bg-slate-100 hover:bg-slate-200 border-slate-300 text-slate-700'
+                          }`}>
+                            <Upload className="w-4 h-4" />
+                            <span>Upload Custom Photo</span>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={handleImageFileChange}
+                              className="hidden"
+                            />
+                          </label>
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                   <form onSubmit={handleFinalSignupSubmit} className="space-y-3">
                     <div className="pt-2 flex items-center gap-3">
@@ -1015,7 +1189,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLogin, onBackToWelcome }) 
                       </button>
                       <button
                         type="submit"
-                        disabled={loading}
+                        disabled={loading || (role === 'merchant' && (!otpVerified || !merchantPaid))}
                         className="btn-neon-crimson flex-2 py-3 rounded-xl text-xs font-extrabold flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 shadow-[0_0_20px_rgba(255,7,58,0.5)]"
                       >
                         {loading ? (
@@ -1025,7 +1199,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLogin, onBackToWelcome }) 
                           </span>
                         ) : (
                           <span className="flex items-center gap-1.5">
-                            <span>Enter Central Mall &rarr;</span>
+                            <span>{role === 'merchant' ? 'Verify & Enter Central Mall' : 'Enter Central Mall'} &rarr;</span>
                           </span>
                         )}
                       </button>

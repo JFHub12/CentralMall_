@@ -224,17 +224,19 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
             </button>
           </ActionTooltip>
 
-          {/* + Sell on Market Header Quick Action (Pure Icon Symbol + Tooltip) */}
-          <ActionTooltip label="Sell on Market (+ List Item)">
-            <button
-              onClick={() => onSelectOption('shop', '', true)}
-              id="sell-on-market-header"
-              aria-label="List an Item to Sell on Marketplace"
-              className="w-10 h-10 lg:w-11 lg:h-11 min-w-[40px] min-h-[40px] lg:min-w-[44px] lg:min-h-[44px] rounded-full flex items-center justify-center bg-[#CE1126] hover:bg-[#A00D1D] text-white shadow-md shadow-red-500/20 transition-all cursor-pointer hover:scale-105 active:scale-95 shrink-0"
-            >
-              <PlusCircle className="w-5 h-5 text-white" />
-            </button>
-          </ActionTooltip>
+          {/* + Sell on Market Header Quick Action (Only for Merchants) */}
+          {user.role === 'merchant' && (
+            <ActionTooltip label="Sell on Market (+ List Item)">
+              <button
+                onClick={() => onSelectOption('shop', '', true)}
+                id="sell-on-market-header"
+                aria-label="List an Item to Sell on Marketplace"
+                className="w-10 h-10 lg:w-11 lg:h-11 min-w-[40px] min-h-[40px] lg:min-w-[44px] lg:min-h-[44px] rounded-full flex items-center justify-center bg-[#CE1126] hover:bg-[#A00D1D] text-white shadow-md shadow-red-500/20 transition-all cursor-pointer hover:scale-105 active:scale-95 shrink-0"
+              >
+                <PlusCircle className="w-5 h-5 text-white" />
+              </button>
+            </ActionTooltip>
+          )}
 
           {/* PWA App Download Button (Pure Icon Symbol + Tooltip) */}
           <ActionTooltip label="Install Central Mall PWA App">
@@ -483,24 +485,28 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                 Marketplace & Sell
               </h3>
               <p className="text-xs font-medium leading-relaxed mb-4 text-slate-300">
-                List textbooks, laptops, apparel, and food with photos. Open to all students & merchants with instant MoMo and WhatsApp chat.
+                {user.role === 'merchant'
+                  ? 'List textbooks, laptops, apparel, and food with photos. Open to verified merchants with instant MoMo and WhatsApp chat.'
+                  : 'Browse textbooks, laptops, apparel, and food with instant MoMo and WhatsApp chat. Buying mode for students and visitors.'}
               </p>
 
-              {/* Direct Sell Item CTA */}
-              <div className="flex items-center gap-2 mb-4">
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onSelectOption('shop', '', true);
-                  }}
-                  className="btn-neon-crimson px-3.5 py-1.5 text-white text-[11px] font-extrabold rounded-full flex items-center gap-1 cursor-pointer transition-all hover:scale-105 active:scale-95"
-                >
-                  <PlusCircle className="w-3 h-3" />
-                  <span>+ Sell an Item Now</span>
-                </button>
-                <span className="text-[10px] text-gray-400 font-bold">Free student listing</span>
-              </div>
+              {/* Direct Sell Item CTA - Only for Merchants */}
+              {user.role === 'merchant' && (
+                <div className="flex items-center gap-2 mb-4">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onSelectOption('shop', '', true);
+                    }}
+                    className="btn-neon-crimson px-3.5 py-1.5 text-white text-[11px] font-extrabold rounded-full flex items-center gap-1 cursor-pointer transition-all hover:scale-105 active:scale-95"
+                  >
+                    <PlusCircle className="w-3 h-3" />
+                    <span>+ Sell an Item Now</span>
+                  </button>
+                  <span className="text-[10px] text-gray-400 font-bold">Verified merchant listing</span>
+                </div>
+              )}
             </div>
 
             <div className="flex items-center justify-between pt-4 border-t border-gray-800/80">

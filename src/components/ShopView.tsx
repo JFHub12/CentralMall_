@@ -422,19 +422,26 @@ export const ShopView: React.FC<ShopViewProps> = ({
         </div>
 
         <div className="flex items-center gap-3">
-          {/* Sell Button */}
-          <button
-            onClick={() => {
-              setImagePreview('');
-              setImage('');
-              setShowSellModal(true);
-            }}
-            id="open-sell-modal-button"
-            className="flex items-center gap-2 bg-[#CE1126] hover:bg-[#A00D1D] text-white font-extrabold text-xs md:text-sm px-4 py-2.5 rounded-full shadow-md shadow-red-200 transition-all cursor-pointer"
-          >
-            <PlusCircle className="w-4 h-4" />
-            <span>List Item to Sell</span>
-          </button>
+          {/* Sell Button - Only visible for verified Merchants */}
+          {user?.role === 'merchant' ? (
+            <button
+              onClick={() => {
+                setImagePreview('');
+                setImage('');
+                setShowSellModal(true);
+              }}
+              id="open-sell-modal-button"
+              className="flex items-center gap-2 bg-[#CE1126] hover:bg-[#A00D1D] text-white font-extrabold text-xs md:text-sm px-4 py-2.5 rounded-full shadow-md shadow-red-200 transition-all cursor-pointer"
+            >
+              <PlusCircle className="w-4 h-4" />
+              <span>List Item to Sell</span>
+            </button>
+          ) : (
+            <div className="flex items-center gap-1.5 px-3 py-2 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 text-xs font-bold border border-slate-200 dark:border-slate-700">
+              <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+              <span>Buying Mode (Merchant Only to Sell)</span>
+            </div>
+          )}
 
           {/* Cart Button */}
           <button
@@ -453,43 +460,45 @@ export const ShopView: React.FC<ShopViewProps> = ({
         </div>
       </div>
 
-      {/* Open Market Hero Banner - Anyone can sell */}
-      <div className="mb-6 p-5 md:p-6 bg-gradient-to-r from-red-50 via-white to-orange-50 border-2 border-red-200/80 rounded-3xl shadow-md text-left flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-        <div className="space-y-1 max-w-xl">
-          <div className="inline-flex items-center gap-1.5 bg-[#CE1126] text-white text-[11px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider shadow-sm">
-            <Sparkles className="w-3 h-3" />
-            <span>Open Campus Marketplace</span>
+      {/* Open Market Hero Banner - Only visible for verified Merchants */}
+      {user?.role === 'merchant' && (
+        <div className="mb-6 p-5 md:p-6 bg-gradient-to-r from-red-50 via-white to-orange-50 border-2 border-red-200/80 rounded-3xl shadow-md text-left flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div className="space-y-1 max-w-xl">
+            <div className="inline-flex items-center gap-1.5 bg-[#CE1126] text-white text-[11px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider shadow-sm">
+              <Sparkles className="w-3 h-3" />
+              <span>Open Campus Marketplace</span>
+            </div>
+            <h2 className="text-lg md:text-xl font-black text-slate-900 leading-snug">
+              Verified Merchant Storefront
+            </h2>
+            <p className="text-xs text-slate-600 font-medium leading-relaxed">
+              List textbooks, electronics, dorm essentials, fashion, or food in seconds with live photo uploads and direct WhatsApp / MoMo checkout!
+            </p>
           </div>
-          <h2 className="text-lg md:text-xl font-black text-slate-900 leading-snug">
-            Anyone Can Sell on Central Mall
-          </h2>
-          <p className="text-xs text-slate-600 font-medium leading-relaxed">
-            Students, hostel residents, faculty & local merchants can list textbooks, electronics, dorm essentials, fashion, or food in seconds with live photo uploads and direct WhatsApp / MoMo checkout!
-          </p>
+          <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto">
+            <button
+              onClick={() => {
+                setImagePreview('');
+                setImage('');
+                setShowSellModal(true);
+              }}
+              id="banner-sell-button"
+              className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-[#CE1126] hover:bg-[#A00D1D] text-white font-extrabold text-xs md:text-sm px-5 py-3 rounded-full shadow-lg shadow-red-200 transition-all hover:scale-105 active:scale-95 cursor-pointer"
+            >
+              <PlusCircle className="w-4 h-4" />
+              <span>+ Sell Your Item Now (Free)</span>
+            </button>
+            <button
+              onClick={() => setSelectedCategory('My Listed Items')}
+              id="banner-my-listings-button"
+              className="flex-1 md:flex-none flex items-center justify-center gap-1.5 bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 font-bold text-xs px-4 py-3 rounded-full transition-all cursor-pointer"
+            >
+              <Tag className="w-3.5 h-3.5 text-[#CE1126]" />
+              <span>My Listings</span>
+            </button>
+          </div>
         </div>
-        <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto">
-          <button
-            onClick={() => {
-              setImagePreview('');
-              setImage('');
-              setShowSellModal(true);
-            }}
-            id="banner-sell-button"
-            className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-[#CE1126] hover:bg-[#A00D1D] text-white font-extrabold text-xs md:text-sm px-5 py-3 rounded-full shadow-lg shadow-red-200 transition-all hover:scale-105 active:scale-95 cursor-pointer"
-          >
-            <PlusCircle className="w-4 h-4" />
-            <span>+ Sell Your Item Now (Free)</span>
-          </button>
-          <button
-            onClick={() => setSelectedCategory('My Listed Items')}
-            id="banner-my-listings-button"
-            className="flex-1 md:flex-none flex items-center justify-center gap-1.5 bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 font-bold text-xs px-4 py-3 rounded-full transition-all cursor-pointer"
-          >
-            <Tag className="w-3.5 h-3.5 text-[#CE1126]" />
-            <span>My Listings</span>
-          </button>
-        </div>
-      </div>
+      )}
 
       {/* Search & Category Filter Bar */}
       <div className="space-y-4 mb-8">

@@ -1167,6 +1167,13 @@ async function startServer() {
   // Product addition endpoint
   app.post('/api/products', (req, res) => {
     const b = req.body || {};
+    const sellerRole = (b.sellerRole || '').toLowerCase();
+    if (sellerRole.includes('student') || sellerRole.includes('visitor') || sellerRole.includes('guest')) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access Restricted: Students and Visitors/Guests are not allowed to add items to the market. Only verified Merchants/Vendors can add items.'
+      });
+    }
     const newProduct = {
       id: b.id || `prod-${Date.now()}`,
       title: b.title || 'Untitled Listing',
