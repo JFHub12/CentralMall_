@@ -60,13 +60,16 @@ function AppContent() {
       setPwaPrompt(e);
     };
     const handleOpenPwaModal = () => setIsPwaModalOpen(true);
+    const handleContentUpdated = () => setRefreshKey((prev) => prev + 1);
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
     window.addEventListener('open-pwa-install', handleOpenPwaModal);
+    window.addEventListener('central_mall_content_updated', handleContentUpdated);
 
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
       window.removeEventListener('open-pwa-install', handleOpenPwaModal);
+      window.removeEventListener('central_mall_content_updated', handleContentUpdated);
     };
   }, []);
 
@@ -156,10 +159,12 @@ function AppContent() {
 
         {currentPage === 'dashboard' && user && (
           <DashboardPage
+            key={`dashboard-${refreshKey}`}
             user={user}
             onSelectOption={handleSelectDashboardOption}
             onLogout={handleLogout}
             onOpenAIChat={() => setIsAIChatOpen(true)}
+            refreshTrigger={refreshKey}
           />
         )}
 
@@ -175,6 +180,7 @@ function AppContent() {
 
         {currentPage === 'gps' && (
           <GPSView
+            key={`gps-${refreshKey}`}
             initialSearchQuery={activeSearchQuery}
             onBackToDashboard={() => setCurrentPage('dashboard')}
           />

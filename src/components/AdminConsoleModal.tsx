@@ -53,7 +53,9 @@ export const AdminConsoleModal: React.FC<AdminConsoleModalProps> = ({
   // Product Form State
   const [formTitle, setFormTitle] = useState('');
   const [formPrice, setFormPrice] = useState('');
-  const [formCategory, setFormCategory] = useState<ProductCategory>('Textbooks & Books');
+  const [formCategory, setFormCategory] = useState<string>('Textbooks & Books');
+  const [isCustomCategory, setIsCustomCategory] = useState<boolean>(false);
+  const [customCategoryInput, setCustomCategoryInput] = useState<string>('');
   const [formDescription, setFormDescription] = useState('');
   const [formImage, setFormImage] = useState('');
   const [formImagePreview, setFormImagePreview] = useState('');
@@ -62,6 +64,14 @@ export const AdminConsoleModal: React.FC<AdminConsoleModalProps> = ({
   const [formLocation, setFormLocation] = useState('Senate Building Ground Floor');
   const [formCondition, setFormCondition] = useState<'Brand New' | 'Like New' | 'Fair'>('Brand New');
   const [actionNotice, setActionNotice] = useState<string | null>(null);
+
+  // Deletion Confirmation Modal State (Reliable without window.confirm)
+  const [confirmDeleteModal, setConfirmDeleteModal] = useState<{
+    type: 'product' | 'notice' | 'order' | 'appointment';
+    id: string;
+    title: string;
+  } | null>(null);
+  const [isDeleting, setIsDeleting] = useState<boolean>(false);
 
   // Orders CMS State
   const [orders, setOrders] = useState<Order[]>([]);
@@ -75,12 +85,25 @@ export const AdminConsoleModal: React.FC<AdminConsoleModalProps> = ({
   const [noticeTitle, setNoticeTitle] = useState('');
   const [noticeSummary, setNoticeSummary] = useState('');
   const [noticeContent, setNoticeContent] = useState('');
-  const [noticeCategory, setNoticeCategory] = useState<CampusNotice['category']>('Academic');
+  const [noticeCategory, setNoticeCategory] = useState<string>('Academic');
   const [noticePriority, setNoticePriority] = useState<CampusNotice['priority']>('normal');
 
   // Clinic Appointments CMS State
   const [appointments, setAppointments] = useState<ClinicAppointment[]>([]);
   const [clinicLoading, setClinicLoading] = useState<boolean>(false);
+  const [isAddAppointmentOpen, setIsAddAppointmentOpen] = useState<boolean>(false);
+  const [apptStudentName, setApptStudentName] = useState('Jesse Fiagbe');
+  const [apptStudentId, setApptStudentId] = useState('CU-2026-9021');
+  const [apptDoctorName, setApptDoctorName] = useState('Dr. Kwame Boateng, MD');
+  const [apptSpecialistRole, setApptSpecialistRole] = useState('Lead Physician & Medical Officer');
+  const [apptConsultationType, setApptConsultationType] = useState<'virtual_video' | 'virtual_voice' | 'in_person'>('virtual_video');
+  const [apptDate, setApptDate] = useState(() => new Date(Date.now() + 86400000).toISOString().split('T')[0]);
+  const [apptTime, setApptTime] = useState('11:00 AM');
+  const [apptTimeSlot, setApptTimeSlot] = useState('11:00 AM - 11:30 AM');
+  const [apptReason, setApptReason] = useState('Routine Health Checkup & Consultation');
+  const [apptSymptoms, setApptSymptoms] = useState('');
+  const [apptNhisNumber, setApptNhisNumber] = useState('NHIS-GH-9021884');
+  const [apptNotes, setApptNotes] = useState('Scheduled directly via Central University Admin Console');
 
   // Password Change State
   const [currentPwdInput, setCurrentPwdInput] = useState('');
@@ -88,6 +111,14 @@ export const AdminConsoleModal: React.FC<AdminConsoleModalProps> = ({
   const [confirmPwdInput, setConfirmPwdInput] = useState('');
   const [pwdChangeMessage, setPwdChangeMessage] = useState<{ text: string; isError: boolean } | null>(null);
   const [isChangingPwd, setIsChangingPwd] = useState(false);
+
+  // Chatbot API Configuration State
+  const [chatApiKeyInput, setChatApiKeyInput] = useState('');
+  const [chatModelInput, setChatModelInput] = useState('openai/gpt-4o-mini');
+  const [chatKeyMessage, setChatKeyMessage] = useState<{ text: string; isError: boolean } | null>(null);
+  const [isSavingChatKey, setIsSavingChatKey] = useState(false);
+  const [showChatKey, setShowChatKey] = useState(false);
+  const MASKED_CHATBOT_KEY_DISPLAY = 'sk-or-v1-********************************';
 
   // Favicon & PWA Suite State
   const [copiedFaviconSvg, setCopiedFaviconSvg] = useState(false);
@@ -211,12 +242,28 @@ export const AdminConsoleModal: React.FC<AdminConsoleModalProps> = ({
     }
   };
 
+  // Fetch Chatbot API Config
+  const loadChatApiStatus = async () => {
+    try {
+      const res = await fetch('/api/admin/chat-api-key');
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.model) {
+          setChatModelInput(data.model);
+        }
+      }
+    } catch {
+      // ignore
+    }
+  };
+
   useEffect(() => {
     if (isOpen && isAuthenticated) {
       loadProducts();
       loadOrders();
       loadNotices();
       loadAppointments();
+      loadChatApiStatus();
     }
   }, [isOpen, isAuthenticated]);
 
@@ -235,6 +282,7 @@ export const AdminConsoleModal: React.FC<AdminConsoleModalProps> = ({
         loadOrders();
         loadNotices();
         loadAppointments();
+        loadChatApiStatus();
       } else {
         setAuthError('Incorrect master admin password. Please try again.');
       }
@@ -308,10 +356,13 @@ export const AdminConsoleModal: React.FC<AdminConsoleModalProps> = ({
       price: parseFloat(formPrice) || 0,
       category: formCategory,
       description: formDescription.trim(),
-      image: formImagePreview || formImage,
-      sellerName: formSellerName.trim(),
-      sellerContact: formSellerContact.trim(),
-      locationOnCampus: formLocation.trim(),
+      image: formImagePreview || formImage || 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?auto=format&fit=crop&q=80&w=800',
+      sellerName: formSellerName.trim() || 'Central Campus Store',
+      sellerContact: formSellerContact.trim() || '+233241234567',
+      sellerRole: 'Central Admin / Official Store',
+      sellerId: 'admin-store',
+      isAdmin: true,
+      locationOnCampus: formLocation.trim() || 'Senate Building Ground Floor',
       condition: formCondition,
     };
 
@@ -324,12 +375,13 @@ export const AdminConsoleModal: React.FC<AdminConsoleModalProps> = ({
       });
 
       if (res.ok) {
-        setActionNotice(editingProduct ? 'Product modified successfully!' : 'New product listed in shop!');
+        setActionNotice(editingProduct ? 'Product modified successfully!' : 'New product listed in shop and visible across website!');
         setTimeout(() => setActionNotice(null), 3000);
         setEditingProduct(null);
         setIsAddModalOpen(false);
         loadProducts();
         if (onProductsUpdated) onProductsUpdated();
+        window.dispatchEvent(new CustomEvent('central_mall_content_updated', { detail: { type: 'product' } }));
       }
     } catch (e) {
       console.error('Error saving product', e);
@@ -347,6 +399,7 @@ export const AdminConsoleModal: React.FC<AdminConsoleModalProps> = ({
         setTimeout(() => setActionNotice(null), 3000);
         loadProducts();
         if (onProductsUpdated) onProductsUpdated();
+        window.dispatchEvent(new CustomEvent('central_mall_content_updated', { detail: { type: 'product' } }));
       }
     } catch (e) {
       console.error('Error deleting product', e);
@@ -364,6 +417,7 @@ export const AdminConsoleModal: React.FC<AdminConsoleModalProps> = ({
         setTimeout(() => setActionNotice(null), 3000);
         loadProducts();
         if (onProductsUpdated) onProductsUpdated();
+        window.dispatchEvent(new CustomEvent('central_mall_content_updated', { detail: { type: 'product' } }));
       }
     } catch (e) {
       console.error('Error resetting products', e);
@@ -434,12 +488,13 @@ export const AdminConsoleModal: React.FC<AdminConsoleModalProps> = ({
         body: JSON.stringify(payload)
       });
       if (res.ok) {
-        setActionNotice(editingNotice ? 'Notice updated!' : 'New campus announcement published!');
+        setActionNotice(editingNotice ? 'Notice updated!' : 'New campus announcement published live to the website!');
         setTimeout(() => setActionNotice(null), 3000);
         setEditingNotice(null);
         setIsAddNoticeOpen(false);
         loadNotices();
         if (onNoticesUpdated) onNoticesUpdated();
+        window.dispatchEvent(new CustomEvent('central_mall_content_updated', { detail: { type: 'notice' } }));
       }
     } catch (e) {
       console.error('Error saving notice', e);
@@ -456,9 +511,43 @@ export const AdminConsoleModal: React.FC<AdminConsoleModalProps> = ({
         setTimeout(() => setActionNotice(null), 3000);
         loadNotices();
         if (onNoticesUpdated) onNoticesUpdated();
+        window.dispatchEvent(new CustomEvent('central_mall_content_updated', { detail: { type: 'notice' } }));
       }
     } catch (e) {
       console.error('Error deleting notice', e);
+    }
+  };
+
+  // Cancel Clinic Appointment
+  const handleCancelAppointment = async (id: string) => {
+    try {
+      const res = await fetch('/api/clinic/appointments/cancel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id })
+      });
+      if (res.ok) {
+        setActionNotice('Appointment marked as cancelled.');
+        setTimeout(() => setActionNotice(null), 3000);
+        loadAppointments();
+      }
+    } catch (e) {
+      console.error('Error cancelling appointment', e);
+    }
+  };
+
+  // Permanently Delete Clinic Appointment
+  const handleDeleteAppointment = async (id: string) => {
+    if (!window.confirm('Permanently delete this clinic appointment record?')) return;
+    try {
+      const res = await fetch(`/api/clinic/appointments?id=${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        setActionNotice('Appointment permanently deleted.');
+        setTimeout(() => setActionNotice(null), 3000);
+        loadAppointments();
+      }
+    } catch (e) {
+      console.error('Error deleting appointment', e);
     }
   };
 
@@ -492,6 +581,34 @@ export const AdminConsoleModal: React.FC<AdminConsoleModalProps> = ({
       setPwdChangeMessage({ text: 'Failed to update admin password.', isError: true });
     } finally {
       setIsChangingPwd(false);
+    }
+  };
+
+  // Handle Chatbot API Key Update
+  const handleSaveChatApiKey = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setChatKeyMessage(null);
+    setIsSavingChatKey(true);
+    try {
+      const res = await fetch('/api/admin/chat-api-key', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          apiKey: chatApiKeyInput,
+          model: chatModelInput
+        })
+      });
+      if (res.ok) {
+        setChatKeyMessage({ text: 'AI Chatbot API updated & masked successfully with asterisks!', isError: false });
+        setChatApiKeyInput('');
+        loadChatApiStatus();
+      } else {
+        setChatKeyMessage({ text: 'Failed to update Chatbot API key.', isError: true });
+      }
+    } catch {
+      setChatKeyMessage({ text: 'Error connecting to server.', isError: true });
+    } finally {
+      setIsSavingChatKey(false);
     }
   };
 
@@ -1148,12 +1265,28 @@ export const AdminConsoleModal: React.FC<AdminConsoleModalProps> = ({
                               Reason: {a.reason || 'General Health Consultation'}
                             </p>
                           </div>
-                          <div className="text-right">
-                            <span className="text-[11px] text-gray-400">
+                          <div className="flex items-center gap-2 mt-2 md:mt-0">
+                            <span className="text-[11px] text-gray-400 mr-2">
                               {a.consultationType === 'virtual_video'
                                 ? '🎥 Virtual Video'
                                 : '🏥 In-Person OPD'}
                             </span>
+                            {a.status !== 'Cancelled' && (
+                              <button
+                                onClick={() => handleCancelAppointment(a.id)}
+                                className="px-2.5 py-1 rounded-lg text-[10px] font-bold text-amber-300 bg-amber-950/60 hover:bg-amber-800/80 border border-amber-800 transition-colors"
+                                title="Mark Cancelled"
+                              >
+                                Cancel
+                              </button>
+                            )}
+                            <button
+                              onClick={() => handleDeleteAppointment(a.id)}
+                              className="p-1.5 rounded-lg text-rose-400 hover:text-white bg-rose-950/50 hover:bg-rose-600 transition-colors"
+                              title="Delete Appointment Record"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
                           </div>
                         </div>
                       ))}
@@ -1564,6 +1697,109 @@ export const AdminConsoleModal: React.FC<AdminConsoleModalProps> = ({
                       </button>
                     </form>
                   </div>
+
+                  {/* Central AI Chatbot API & OpenRouter Credentials */}
+                  <div className="bg-[#12121c] border border-gray-800 rounded-3xl p-6">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="w-10 h-10 rounded-xl bg-[#ff073a]/20 border border-[#ff073a]/50 flex items-center justify-center text-[#ff073a]">
+                        <Sparkles className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-bold text-white">Central AI Chatbot API Credentials</h4>
+                        <p className="text-xs text-gray-400">OpenRouter AI & Campus Knowledge Engine configuration</p>
+                      </div>
+                    </div>
+
+                    <div className="p-3.5 bg-gray-950/80 rounded-2xl border border-gray-800 mb-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                      <div>
+                        <span className="text-xs text-gray-400">Active API Key Mask:</span>
+                        <div className="font-mono text-sm font-bold text-rose-400 tracking-wider">
+                          {MASKED_CHATBOT_KEY_DISPLAY}
+                        </div>
+                      </div>
+                      <span className="text-[10px] text-emerald-400 font-semibold bg-emerald-950/60 border border-emerald-800 px-2.5 py-1 rounded-full flex items-center gap-1">
+                        <Check className="w-3 h-3" /> Asterisk Encrypted
+                      </span>
+                    </div>
+
+                    <form onSubmit={handleSaveChatApiKey} className="space-y-4">
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-300 mb-1">
+                          AI Model Provider & Engine
+                        </label>
+                        <select
+                          value={chatModelInput}
+                          onChange={(e) => setChatModelInput(e.target.value)}
+                          className="w-full px-3.5 py-2.5 bg-gray-950 border border-gray-700 rounded-xl text-xs text-white focus:outline-none focus:border-[#ff073a]"
+                        >
+                          <option value="openai/gpt-4o-mini">OpenAI GPT-4o Mini (Ultra Fast & Smart)</option>
+                          <option value="google/gemini-flash-1.5">Google Gemini Flash (High Context)</option>
+                          <option value="anthropic/claude-3-haiku">Anthropic Claude 3 Haiku (Analytical)</option>
+                          <option value="meta-llama/llama-3.1-8b-instruct">Meta Llama 3.1 8B (Open Source)</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-300 mb-1">
+                          Update API Key (Optional)
+                        </label>
+                        <div className="relative">
+                          <input
+                            type={showChatKey ? 'text' : 'password'}
+                            value={chatApiKeyInput}
+                            onChange={(e) => setChatApiKeyInput(e.target.value)}
+                            placeholder="sk-or-v1-********************************"
+                            className="w-full px-3.5 py-2.5 pr-10 bg-gray-950 border border-gray-700 rounded-xl text-xs text-white focus:outline-none focus:border-[#ff073a] font-mono"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowChatKey(!showChatKey)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-200"
+                          >
+                            {showChatKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          </button>
+                        </div>
+                        <p className="text-[10px] text-gray-500 mt-1">
+                          Stored securely on server. Displayed as asterisks to protect your secret key.
+                        </p>
+                      </div>
+
+                      {chatKeyMessage && (
+                        <div
+                          className={`p-3 rounded-xl text-xs flex items-center gap-2 ${
+                            chatKeyMessage.isError
+                              ? 'bg-rose-950/60 border border-rose-800 text-rose-300'
+                              : 'bg-emerald-950/60 border border-emerald-800 text-emerald-300'
+                          }`}
+                        >
+                          {chatKeyMessage.isError ? (
+                            <AlertCircle className="w-4 h-4 shrink-0" />
+                          ) : (
+                            <CheckCircle2 className="w-4 h-4 shrink-0" />
+                          )}
+                          <span>{chatKeyMessage.text}</span>
+                        </div>
+                      )}
+
+                      <button
+                        type="submit"
+                        disabled={isSavingChatKey || (!chatApiKeyInput && !chatModelInput)}
+                        className="w-full py-2.5 px-4 rounded-xl font-bold text-xs text-white bg-gradient-to-r from-[#ff073a] to-[#d4002e] hover:shadow-[0_0_15px_rgba(255,7,58,0.5)] transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                      >
+                        {isSavingChatKey ? (
+                          <>
+                            <RefreshCw className="w-4 h-4 animate-spin" />
+                            <span>Updating AI Credentials...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Key className="w-4 h-4" />
+                            <span>Save Chatbot API Configuration</span>
+                          </>
+                        )}
+                      </button>
+                    </form>
+                  </div>
                 </div>
               )}
             </div>
@@ -1647,23 +1883,66 @@ export const AdminConsoleModal: React.FC<AdminConsoleModalProps> = ({
                     />
                   </div>
 
-                  {/* Image Upload or URL */}
+                  {/* Image Upload, Direct URL or Presets */}
                   <div>
-                    <label className="block text-xs font-semibold text-gray-300 mb-1">Product Photo</label>
-                    <div className="flex items-center gap-3">
-                      {formImagePreview && (
+                    <label className="block text-xs font-semibold text-gray-300 mb-1">Product Photo (URL, Upload, or Preset)</label>
+                    <div className="flex items-center gap-3 mb-2">
+                      {formImagePreview ? (
                         <img
                           src={formImagePreview}
                           alt="Preview"
-                          className="w-12 h-12 rounded-xl object-cover border border-gray-700 shrink-0"
+                          className="w-14 h-14 rounded-xl object-cover border border-[#ff073a]/50 shrink-0 shadow-md shadow-red-950"
                         />
+                      ) : (
+                        <div className="w-14 h-14 rounded-xl bg-gray-900 border border-gray-700 flex items-center justify-center text-gray-500 text-[10px] shrink-0">
+                          No Photo
+                        </div>
                       )}
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={handleProductImageFile}
-                        className="text-xs text-gray-400 file:mr-2 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-gray-800 file:text-rose-300 hover:file:bg-gray-700"
-                      />
+                      <div className="flex-1 space-y-1.5">
+                        <input
+                          type="text"
+                          value={formImage}
+                          onChange={(e) => {
+                            setFormImage(e.target.value);
+                            setFormImagePreview(e.target.value);
+                          }}
+                          placeholder="Paste image URL (e.g. https://...)..."
+                          className="w-full px-3 py-1.5 bg-gray-950 border border-gray-700 rounded-xl text-xs text-white focus:outline-none focus:border-[#ff073a]"
+                        />
+                        <div className="flex items-center gap-2">
+                          <label className="text-[11px] text-gray-400 font-medium">Or choose file:</label>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={handleProductImageFile}
+                            className="text-xs text-gray-400 file:mr-2 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-gray-800 file:text-rose-300 hover:file:bg-gray-700 cursor-pointer"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    {/* Quick Presets */}
+                    <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+                      <span className="text-[10px] font-bold text-gray-500 uppercase shrink-0">Presets:</span>
+                      {[
+                        { name: 'Law Book', url: 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?auto=format&fit=crop&q=80&w=800' },
+                        { name: 'Laptop', url: 'https://images.unsplash.com/photo-1496181133206-80ce9b88a853?auto=format&fit=crop&q=80&w=800' },
+                        { name: 'Varsity Jacket', url: 'https://images.unsplash.com/photo-1551028719-00167b16eac5?auto=format&fit=crop&q=80&w=800' },
+                        { name: 'Jollof Combo', url: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&q=80&w=800' },
+                        { name: 'Calculator', url: 'https://images.unsplash.com/photo-1587145820266-a5951ee6f620?auto=format&fit=crop&q=80&w=800' },
+                        { name: 'Desk Lamp', url: 'https://images.unsplash.com/photo-1507473885765-e6ed057f782c?auto=format&fit=crop&q=80&w=800' }
+                      ].map((preset) => (
+                        <button
+                          key={preset.name}
+                          type="button"
+                          onClick={() => {
+                            setFormImage(preset.url);
+                            setFormImagePreview(preset.url);
+                          }}
+                          className="px-2 py-0.5 rounded-lg bg-gray-900 hover:bg-gray-800 border border-gray-800 text-[10px] text-gray-300 hover:text-white shrink-0 transition-colors"
+                        >
+                          {preset.name}
+                        </button>
+                      ))}
                     </div>
                   </div>
 

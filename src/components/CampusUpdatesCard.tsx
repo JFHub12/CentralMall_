@@ -11,9 +11,10 @@ import { PenBookLoading3D } from './PenBookLoading3D';
 
 interface CampusUpdatesCardProps {
   onNavigateToOption?: (option: 'shop' | 'gps' | 'clinic', query?: string) => void;
+  refreshTrigger?: number;
 }
 
-export const CampusUpdatesCard: React.FC<CampusUpdatesCardProps> = ({ onNavigateToOption }) => {
+export const CampusUpdatesCard: React.FC<CampusUpdatesCardProps> = ({ onNavigateToOption, refreshTrigger }) => {
   const { theme } = useTheme();
   const isDark = theme === 'dark';
 
@@ -56,7 +57,12 @@ export const CampusUpdatesCard: React.FC<CampusUpdatesCardProps> = ({ onNavigate
 
   useEffect(() => {
     fetchNotices();
-  }, []);
+    const handleUpdate = () => {
+      fetchNotices(true);
+    };
+    window.addEventListener('central_mall_content_updated', handleUpdate);
+    return () => window.removeEventListener('central_mall_content_updated', handleUpdate);
+  }, [refreshTrigger]);
 
   // Filter notices by category and search
   const filteredNotices = notices.filter((notice) => {

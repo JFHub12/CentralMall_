@@ -110,6 +110,11 @@ export const ShopView: React.FC<ShopViewProps> = ({
 
   useEffect(() => {
     fetchProducts();
+    const handleUpdate = () => {
+      fetchProducts();
+    };
+    window.addEventListener('central_mall_content_updated', handleUpdate);
+
     fetch('/api/rates')
       .then(async res => {
         if (!res.ok) return null;
@@ -121,6 +126,10 @@ export const ShopView: React.FC<ShopViewProps> = ({
         if (data && data.usdRate) setUsdRate(data.usdRate);
       })
       .catch(() => {});
+
+    return () => {
+      window.removeEventListener('central_mall_content_updated', handleUpdate);
+    };
   }, []);
 
   // Handle local image file upload into Base64 for Sell Modal

@@ -16,6 +16,7 @@ interface DashboardPageProps {
   onSelectOption: (option: 'shop' | 'gps' | 'clinic', searchQuery?: string, openSellModal?: boolean) => void;
   onLogout: () => void;
   onOpenAIChat: () => void;
+  refreshTrigger?: number;
 }
 
 export const DashboardPage: React.FC<DashboardPageProps> = ({
@@ -23,6 +24,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
   onSelectOption,
   onLogout,
   onOpenAIChat,
+  refreshTrigger,
 }) => {
   const { theme } = useTheme();
   const [globalSearch, setGlobalSearch] = useState('');
@@ -592,7 +594,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
 
         {/* Official Campus Updates & Notices from central.edu.gh */}
         <div className="mt-8">
-          <CampusUpdatesCard onNavigateToOption={onSelectOption} />
+          <CampusUpdatesCard onNavigateToOption={onSelectOption} refreshTrigger={refreshTrigger} />
         </div>
       </div>
 

@@ -67,6 +67,11 @@ export const ClinicView: React.FC<ClinicViewProps> = ({ user, onBackToDashboard 
 
   useEffect(() => {
     fetchAppointments();
+    const handleUpdate = () => {
+      fetchAppointments();
+    };
+    window.addEventListener('central_mall_content_updated', handleUpdate);
+    return () => window.removeEventListener('central_mall_content_updated', handleUpdate);
   }, [user]);
 
   // Handle Send Message to Clinic Nurse AI

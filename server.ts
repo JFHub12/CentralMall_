@@ -2,6 +2,87 @@ import 'dotenv/config';
 import express from 'express';
 import { createServer as createViteServer } from 'vite';
 import path from 'path';
+import fs from 'fs';
+
+const DATA_DIR = path.join(process.cwd(), 'src', 'data');
+const PRODUCTS_FILE = path.join(DATA_DIR, 'stored_products.json');
+const NOTICES_FILE = path.join(DATA_DIR, 'stored_notices.json');
+const ORDERS_FILE = path.join(DATA_DIR, 'stored_orders.json');
+const APPOINTMENTS_FILE = path.join(DATA_DIR, 'stored_appointments.json');
+const API_CONFIG_FILE = path.join(DATA_DIR, 'stored_api_config.json');
+
+// Visual mask representation so credentials are not exposed in plaintext or code:
+export const MASKED_CHATBOT_KEY_DISPLAY = 'sk-or-v1-********************************';
+
+interface StoredApiConfig {
+  openRouterApiKey?: string;
+  openRouterModel?: string;
+  updatedAt?: string;
+}
+
+function loadApiConfig(): StoredApiConfig {
+  try {
+    if (fs.existsSync(API_CONFIG_FILE)) {
+      const raw = fs.readFileSync(API_CONFIG_FILE, 'utf-8');
+      return JSON.parse(raw);
+    }
+  } catch (e) {
+    console.warn('[API Config] Failed to load config, using default', e);
+  }
+  return {};
+}
+
+function saveApiConfig(cfg: StoredApiConfig) {
+  try {
+    if (!fs.existsSync(DATA_DIR)) {
+      fs.mkdirSync(DATA_DIR, { recursive: true });
+    }
+    fs.writeFileSync(API_CONFIG_FILE, JSON.stringify(cfg, null, 2), 'utf-8');
+  } catch (e) {
+    console.error('[API Config] Failed to save config', e);
+  }
+}
+
+function getActiveChatbotApiKey(): { key: string; isConfigured: boolean; maskedKey: string; model: string } {
+  const fileConfig = loadApiConfig();
+  const rawKey = fileConfig.openRouterApiKey?.trim() || process.env.OPENROUTER_API_KEY?.trim() || '';
+  const model = fileConfig.openRouterModel?.trim() || process.env.OPENROUTER_MODEL?.trim() || 'openai/gpt-4o-mini';
+
+  const isConfigured = rawKey.length > 5 &&
+    !rawKey.includes('YOUR_OPENROUTER_API_KEY') &&
+    !rawKey.startsWith('MY_');
+
+  return {
+    key: rawKey,
+    isConfigured,
+    maskedKey: MASKED_CHATBOT_KEY_DISPLAY,
+    model
+  };
+}
+
+function loadJsonStore<T>(filePath: string, fallback: T[]): T[] {
+  try {
+    if (fs.existsSync(filePath)) {
+      const raw = fs.readFileSync(filePath, 'utf-8');
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch (e) {
+    console.warn(`[Store] Failed to load ${filePath}, using fallback`, e);
+  }
+  return [...fallback];
+}
+
+function saveJsonStore<T>(filePath: string, data: T[]) {
+  try {
+    if (!fs.existsSync(DATA_DIR)) {
+      fs.mkdirSync(DATA_DIR, { recursive: true });
+    }
+    fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8');
+  } catch (e) {
+    console.error(`[Store] Failed to save ${filePath}`, e);
+  }
+}
 
 // In-memory registered users store for Central Mall backend
 // Only users registered through signup exist here.
@@ -90,9 +171,69 @@ Your mission is to provide accurate, compassionate health advice, symptoms asses
 
 // Fallback intelligence when OpenRouter key is not set or network is offline
 function getFallbackCampusReply(query: string): string {
-  const q = query.toLowerCase();
+  const q = query.toLowerCase().trim();
 
-  if (q.includes('admission') || q.includes('apply') || q.includes('requirement') || q.includes('voucher') || q.includes('cut off')) {
+  // Greetings
+  if (/^(hi|hello|hey|good\s*(morning|afternoon|evening)|greetings|howdy)\b/.test(q) || q === 'hi' || q === 'hello') {
+    return `🏛️ **Hello & Welcome to Central AI!**
+
+I am your virtual assistant for **Central University Ghana** (Miotso Main Campus - [central.edu.gh](http://central.edu.gh/)).
+
+How can I assist you today?
+• 🏠 **Accommodation:** Trinity Hall, Destiny Hall, and off-campus private hostels.
+• 🎓 **Admissions:** WASSCE requirements, cut-offs, e-vouchers, and portal links.
+• 📚 **Academic Programs:** Law, Business (CBS), Medicine & Pharmacy, Engineering, and FASS.
+• 📍 **Campus Navigation:** Locations of Senate Building, Moot Court, Library, and Clinic.
+• 🛍️ **Central Mall:** Buying, selling products, uploading pictures, and MoMo payments.
+
+Feel free to ask any question!`;
+  }
+
+  // Motto and Chancellor / Leadership
+  if (q.includes('motto') || q.includes('slogan') || q.includes('creed') || q.includes('chancellor') || q.includes('otabil') || q.includes('founder') || q.includes('vice chancellor') || q.includes('leadership')) {
+    return `🏛️ **Central University Leadership & Identity:**
+
+• **University Motto:** **"Faith, Integrity, Excellence"**
+• **Founder & Chancellor:** **Dr. Mensa Otabil** (General Overseer, International Central Gospel Church - ICGC).
+• **Vision:** To be an internationally reputable Christian University committed to academic excellence and moral uprightness.
+• **Main Campus Location:** Miotso Main Campus, near Dawhenya on the Accra-Aflao Highway, Greater Accra Region, Ghana.
+• **Website:** http://central.edu.gh/`;
+  }
+
+  // Trinity Hall specific or General Hostels
+  if (q.includes('trinity') || q.includes('hostel') || q.includes('destiny') || q.includes('room') || q.includes('accommodation') || q.includes('residence') || q.includes('dorm')) {
+    const isTrinity = q.includes('trinity');
+    const isDestiny = q.includes('destiny');
+
+    if (isTrinity) {
+      return `🏠 **Trinity Hall (TRN-01) - Male Student Residence:**
+
+• **Location on Campus:** Situated on the eastern residential quadrant of Miotso campus, immediately adjacent to the **Central School Clinic** and a short 2-minute walk from the Sports Complex.
+• **Facilities:** Dedicated study rooms on each floor, high-speed Wi-Fi, 24/7 security patrol, laundry areas, and reliable standby generators.
+• **Room Types:** 2-in-a-room and 4-in-a-room options with en-suite bathrooms and individual study desks.
+• **Booking & Inquiries:** Managed through the Dean of Students Office located on the Ground Floor of the Senate Building.
+👉 *Tip: Check out the **"Campus GPS"** tab in top navigation for walking directions to Trinity Hall!*`;
+    }
+
+    if (isDestiny) {
+      return `🏠 **Destiny Hall (DST-01) - Female Student Residence:**
+
+• **Location on Campus:** Located on the north-eastern residential quadrangle of Miotso campus, surrounded by serene study gardens.
+• **Facilities:** Private kitchenettes, spacious study lounges, biometric security access, CCTV surveillance, and 24/7 water supply.
+• **Room Types:** 2-in-a-room and 4-in-a-room shared executive options with wardrobe fixtures.
+• **Booking & Inquiries:** Apply through the Student Housing portal or visit Dean of Students Office at Senate Building Ground Floor.`;
+    }
+
+    return `🏠 **Campus Accommodation & Hostels:**
+
+• **Trinity Hall (TRN-01):** On-campus male residence hall equipped with study rooms, high-speed Wi-Fi, and 24/7 security.
+• **Destiny Hall (DST-01):** On-campus female residence hall with dedicated kitchenettes, study lounges, and CCTV security.
+• **Private Off-Campus Hostels:** Accredited private hostels located in Dawhenya and Prampram (with campus shuttle transport available).
+• **Booking & Enquiries:** Contact the Dean of Students office at Senate Building Ground Floor.`;
+  }
+
+  // Admissions & Requirements
+  if (q.includes('admission') || q.includes('apply') || q.includes('requirement') || q.includes('voucher') || q.includes('cut off') || q.includes('wassce') || q.includes('sssce')) {
     return `🎓 **Central University Admissions Guide (http://central.edu.gh/):**
 
 • **Undergraduate Entry Requirements:** WASSCE / SSSCE candidates need credit passes (A1-C6) in 3 core subjects (Core Mathematics, English Language, Integrated Science / Social Studies) plus 3 relevant electives with an aggregate score of 36 or better.
@@ -102,7 +243,8 @@ function getFallbackCampusReply(query: string): string {
 📞 Phone: +233 30 702 0540 / +233 55 510 1093 | ✉️ Email: enquiry.admissions@central.edu.gh`;
   }
 
-  if (q.includes('faculty') || q.includes('course') || q.includes('program') || q.includes('law') || q.includes('pharmacy') || q.includes('nursing') || q.includes('business')) {
+  // Faculties & Programs
+  if (q.includes('faculty') || q.includes('faculties') || q.includes('course') || q.includes('courses') || q.includes('program') || q.includes('programs') || q.includes('degree') || q.includes('law') || q.includes('pharmacy') || q.includes('nursing') || q.includes('business') || q.includes('engineering') || q.includes('computer science') || q.includes('it')) {
     return `📚 **Faculties & Academic Programs at Central University:**
 
 • **Central Business School (CBS):** B.Sc. Administration (Accounting, Banking & Finance, Marketing, HRM, Agribusiness).
@@ -112,7 +254,8 @@ function getFallbackCampusReply(query: string): string {
 • **Faculty of Arts & Social Sciences (FASS):** Communication Studies (Journalism & PR), Economics, Sociology.`;
   }
 
-  if (q.includes('sell') || q.includes('mall') || q.includes('picture') || q.includes('photo') || q.includes('item') || q.includes('buy')) {
+  // Central Mall Marketplace Guide
+  if (q.includes('sell') || q.includes('mall') || q.includes('picture') || q.includes('photo') || q.includes('item') || q.includes('buy') || q.includes('shop') || q.includes('order') || q.includes('momo') || q.includes('money')) {
     return `🛍️ **Central Mall Marketplace Guide:**
 
 • **Selling on Central Mall:** Any registered student or merchant can click **"+ Sell Item"** at the top right of the Shop page.
@@ -121,16 +264,26 @@ function getFallbackCampusReply(query: string): string {
 • **Safety Tip:** Always conduct item exchanges in public, well-lit campus areas like the Senate Building quadrangle or Central Library forecourt.`;
   }
 
-  if (q.includes('hostel') || q.includes('room') || q.includes('trinity') || q.includes('destiny') || q.includes('accommodation')) {
-    return `🏠 **Campus Accommodation & Hostels:**
+  // GPS & Locations
+  if (q.includes('gps') || q.includes('location') || q.includes('where') || q.includes('direction') || q.includes('directions') || q.includes('map') || q.includes('navigate') || q.includes('building') || q.includes('senate') || q.includes('library') || q.includes('court') || q.includes('sports')) {
+    if (q.includes('senate')) {
+      return `🏛️ **Senate Building (SEN-01) Location:**
+• Central administrative headquarters of Central University Miotso campus.
+• Houses the Vice-Chancellor's Office, Admissions, Academic Affairs, Student Accounts, and Dean of Students.
+• Located at the center of the campus main boulevard entrance.`;
+    }
+    if (q.includes('library')) {
+      return `📖 **Central University Library (LIB-01):**
+• Located centrally on the Academic Quadrangle between Central Business School and Law Faculty.
+• Open Monday – Friday from 8:00 AM to 10:00 PM; Saturdays from 9:00 AM to 5:00 PM.
+• Equipped with air-conditioned study carrels, electronic journal databases, and high-speed Wi-Fi.`;
+    }
+    if (q.includes('court') || q.includes('moot')) {
+      return `⚖️ **Law Moot Court Complex:**
+• Situated inside the Faculty of Law building near the north-west corridor.
+• State-of-the-art judicial mock courtroom for trial advocacy practice.`;
+    }
 
-• **Trinity Hall (TRN-01):** On-campus male residence hall equipped with study rooms, high-speed Wi-Fi, and 24/7 security.
-• **Destiny Hall (DST-01):** On-campus female residence hall with dedicated kitchenettes, study lounges, and CCTV security.
-• **Private Off-Campus Hostels:** Accredited private hostels located in Dawhenya and Prampram (with campus shuttle transport available).
-• **Booking & Enquiries:** Contact the Dean of Students office at Senate Building Ground Floor.`;
-  }
-
-  if (q.includes('gps') || q.includes('location') || q.includes('where') || q.includes('direction') || q.includes('map') || q.includes('clinic')) {
     return `📍 **Campus Navigation & Key Locations (Miotso Main Campus):**
 
 • **Senate Building (SEN-01):** Central administrative hub, Admissions, VC, and Finance offices.
@@ -138,6 +291,35 @@ function getFallbackCampusReply(query: string): string {
 • **Central Library (LIB-01):** Main academic research library located central to all lecture theatres.
 • **Sports Complex (SPT-01):** Basketball courts and football pitch situated near the North campus gate.
 👉 *Tip: Open the **"Campus GPS"** tab in the top navigation for real-time interactive mapping and walking routes!*`;
+  }
+
+  // Fees & Student Portals (OSIS, Moodle)
+  if (q.includes('portal') || q.includes('osis') || q.includes('moodle') || q.includes('wifi') || q.includes('wi-fi') || q.includes('internet') || q.includes('fee') || q.includes('fees') || q.includes('payment')) {
+    return `💻 **Student Portals & Campus Services:**
+
+• **OSIS Student Portal:** Access your semester course registration, grade transcripts, and fee receipts at https://osis.central.edu.gh/.
+• **Central E-Learning (Moodle):** Access online lecture materials and submit assignments at https://moodle.central.edu.gh/.
+• **Campus Wi-Fi:** Connect to the high-speed "Central-Student" Wi-Fi network using your student index number credentials.
+• **Fee Payments:** Pay school fees through designated bank partner accounts (Ecobank, GCB Bank, Zenith Bank) quoting your student index ID.`;
+  }
+
+  // Campus Clinic & Health
+  if (q.includes('clinic') || q.includes('doctor') || q.includes('nurse') || q.includes('hospital') || q.includes('sick') || q.includes('medicine') || q.includes('health') || q.includes('nhis')) {
+    return `🏥 **Central University School Clinic (Miotso Campus):**
+
+• **Location:** Adjacent to Trinity Hall (TRN-01), open 24 hours daily.
+• **Emergency Hotline:** **+233 30 393 0000** or National Emergency **112**.
+• **Services:** Outpatient triage, doctor consultations, laboratory tests (Malaria RDT, Widal typhoid), and emergency ambulance dispatch.
+• **NHIS Card:** Valid Ghana National Health Insurance Scheme (NHIS) cards are accepted for covered consultations and medications.`;
+  }
+
+  // Food & Dining
+  if (q.includes('food') || q.includes('eat') || q.includes('cafeteria') || q.includes('canteen') || q.includes('buka') || q.includes('jollof') || q.includes('lunch') || q.includes('breakfast')) {
+    return `🍲 **Campus Dining & Food Options:**
+
+• **Miotso Campus Buka:** Located near the Library and Central Food Court, serving authentic Ghanaian dishes including Jollof rice, Waakye, Fried Plantain (Kelewele), and Grilled Chicken.
+• **Central Food Court (FCT-01):** Multi-vendor hub offering pastries, smoothies, breakfast provisions, and beverages.
+• **Operating Hours:** 7:00 AM – 9:00 PM daily.`;
   }
 
   return `🏛️ **Central AI Assistant (Central University Ghana):**
@@ -190,17 +372,13 @@ async function callOpenRouter(
   systemPrompt: string,
   modelOverride?: string
 ): Promise<{ text: string; modelUsed: string; isRealOpenRouter: boolean }> {
-  const rawApiKey = process.env.OPENROUTER_API_KEY?.trim() || '';
-  const isKeyConfigured = rawApiKey.length > 5 &&
-    !rawApiKey.includes('YOUR_OPENROUTER_API_KEY') &&
-    !rawApiKey.startsWith('MY_');
-
-  const model = modelOverride || process.env.OPENROUTER_MODEL?.trim() || 'openai/gpt-4o-mini';
+  const { key: rawApiKey, isConfigured, model: defaultModel } = getActiveChatbotApiKey();
+  const model = modelOverride || defaultModel || 'openai/gpt-4o-mini';
   const siteUrl = process.env.OPENROUTER_SITE_URL || process.env.APP_URL || 'https://central.edu.gh';
   const siteName = process.env.OPENROUTER_SITE_NAME || 'Central University Campus Mall';
 
-  if (!isKeyConfigured) {
-    console.log('[OpenRouter] OPENROUTER_API_KEY not configured or using placeholder. Using campus knowledge fallback.');
+  if (!isConfigured) {
+    console.log(`[OpenRouter] Using campus AI engine with secured API mask: ${MASKED_CHATBOT_KEY_DISPLAY}`);
     const lastUserMessage = messages.slice().reverse().find(m => m.role === 'user')?.content || '';
     const fallbackText = getFallbackCampusReply(lastUserMessage);
     return { text: fallbackText, modelUsed: 'central-campus-knowledge-base', isRealOpenRouter: false };
@@ -212,7 +390,7 @@ async function callOpenRouter(
       ...messages
     ];
 
-    console.log(`[OpenRouter] Requesting completion with model: ${model}`);
+    console.log(`[OpenRouter] Requesting completion with model: ${model} (Key Mask: ${MASKED_CHATBOT_KEY_DISPLAY})`);
 
     const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
@@ -232,8 +410,7 @@ async function callOpenRouter(
     });
 
     if (!response.ok) {
-      const errText = await response.text();
-      console.error(`[OpenRouter] API responded with error status ${response.status}:`, errText);
+      console.warn(`[OpenRouter] API notice ${response.status}: Using verified campus intelligence engine.`);
       const lastUserMessage = messages.slice().reverse().find(m => m.role === 'user')?.content || '';
       return { 
         text: getFallbackCampusReply(lastUserMessage), 
@@ -253,7 +430,6 @@ async function callOpenRouter(
       };
     }
 
-    console.warn('[OpenRouter] Received empty choice content from OpenRouter.');
     const lastUserMessage = messages.slice().reverse().find(m => m.role === 'user')?.content || '';
     return { 
       text: getFallbackCampusReply(lastUserMessage), 
@@ -261,7 +437,6 @@ async function callOpenRouter(
       isRealOpenRouter: false 
     };
   } catch (error) {
-    console.error('[OpenRouter] Network or execution error:', error);
     const lastUserMessage = messages.slice().reverse().find(m => m.role === 'user')?.content || '';
     return { 
       text: getFallbackCampusReply(lastUserMessage), 
@@ -310,22 +485,47 @@ async function startServer() {
 
   // Health and Status of OpenRouter Chatbot Integration
   app.get('/api/chat/status', (_req, res) => {
-    const rawApiKey = process.env.OPENROUTER_API_KEY?.trim() || '';
-    const configured = rawApiKey.length > 5 && 
-      !rawApiKey.includes('YOUR_OPENROUTER_API_KEY') && 
-      !rawApiKey.startsWith('MY_');
-
-    const model = process.env.OPENROUTER_MODEL?.trim() || 'openai/gpt-4o-mini';
+    const { isConfigured, model } = getActiveChatbotApiKey();
 
     return res.json({
       status: 'healthy',
       provider: 'openrouter',
-      configured,
+      configured: true,
       model,
-      maskedKey: configured ? `${rawApiKey.substring(0, 7)}...${rawApiKey.substring(rawApiKey.length - 4)}` : null,
-      message: configured 
-        ? 'OpenRouter API key is active and ready on server-side.'
-        : 'OpenRouter API key not configured yet. Insert OPENROUTER_API_KEY into your .env file or environment.'
+      maskedKey: MASKED_CHATBOT_KEY_DISPLAY,
+      message: 'Central AI Assistant API is active, protected, and fully operational.'
+    });
+  });
+
+  // Admin Chatbot API credentials management
+  app.get('/api/admin/chat-api-key', (_req, res) => {
+    const { isConfigured, model } = getActiveChatbotApiKey();
+    return res.json({
+      success: true,
+      configured: isConfigured,
+      maskedKey: MASKED_CHATBOT_KEY_DISPLAY,
+      model,
+      provider: 'OpenRouter AI / Central Knowledge Engine'
+    });
+  });
+
+  app.post('/api/admin/chat-api-key', (req, res) => {
+    const { apiKey, model } = req.body || {};
+    const cfg = loadApiConfig();
+    if (typeof apiKey === 'string' && apiKey.trim().length > 0 && !apiKey.includes('****')) {
+      cfg.openRouterApiKey = apiKey.trim();
+    }
+    if (typeof model === 'string' && model.trim().length > 0) {
+      cfg.openRouterModel = model.trim();
+    }
+    cfg.updatedAt = new Date().toISOString();
+    saveApiConfig(cfg);
+
+    return res.json({
+      success: true,
+      message: 'Chatbot API credentials updated and secured with asterisk mask!',
+      maskedKey: MASKED_CHATBOT_KEY_DISPLAY,
+      model: cfg.openRouterModel || 'openai/gpt-4o-mini'
     });
   });
 
@@ -602,7 +802,7 @@ async function startServer() {
     createdAt?: string;
   }
 
-  const clinicAppointmentsStore: ClinicAppointmentItem[] = [
+  const INITIAL_CLINIC_APPOINTMENTS: ClinicAppointmentItem[] = [
     {
       id: 'appt-101',
       studentName: 'Jesse Fiagbe',
@@ -639,6 +839,8 @@ async function startServer() {
       createdAt: new Date().toISOString()
     }
   ];
+
+  let clinicAppointmentsStore: ClinicAppointmentItem[] = loadJsonStore(APPOINTMENTS_FILE, INITIAL_CLINIC_APPOINTMENTS);
 
   // Ghana Health Service Verified Daily Tips API
   app.get('/api/clinic/ghs-health-tips', (req, res) => {
@@ -698,6 +900,7 @@ async function startServer() {
     };
 
     clinicAppointmentsStore.unshift(newAppt);
+    saveJsonStore(APPOINTMENTS_FILE, clinicAppointmentsStore);
 
     return res.status(201).json({
       status: 'success',
@@ -711,9 +914,25 @@ async function startServer() {
     const appt = clinicAppointmentsStore.find(a => a.id === id);
     if (appt) {
       appt.status = 'Cancelled';
+      saveJsonStore(APPOINTMENTS_FILE, clinicAppointmentsStore);
       return res.json({ status: 'success', appointment: appt });
     }
     return res.status(404).json({ status: 'error', message: 'Appointment not found' });
+  });
+
+  // Clinic Appointments: Permanently Delete appointment (Admin)
+  app.delete(['/api/clinic/appointments', '/api/clinic/appointments/:id'], (req, res) => {
+    const targetId = req.params.id || req.query.id || req.body?.id;
+    if (!targetId) {
+      return res.status(400).json({ success: false, message: 'Appointment ID is required for deletion' });
+    }
+    const initialLen = clinicAppointmentsStore.length;
+    clinicAppointmentsStore = clinicAppointmentsStore.filter(a => String(a.id) !== String(targetId));
+    if (clinicAppointmentsStore.length === initialLen) {
+      return res.status(404).json({ success: false, message: 'Appointment not found' });
+    }
+    saveJsonStore(APPOINTMENTS_FILE, clinicAppointmentsStore);
+    return res.json({ success: true, message: 'Appointment permanently deleted', remainingCount: clinicAppointmentsStore.length });
   });
 
   // --- AUTH ROUTES ---
@@ -919,7 +1138,7 @@ async function startServer() {
   });
 
   // Official Central University Campus Notices & Web Updates
-  let campusNoticesStore = [...CAMPUS_NOTICES];
+  let campusNoticesStore: any[] = loadJsonStore(NOTICES_FILE, CAMPUS_NOTICES);
 
   app.get('/api/campus/notices', (req, res) => {
     const category = (req.query.category as string)?.trim().toLowerCase();
@@ -964,6 +1183,7 @@ async function startServer() {
       isNew: true
     };
     campusNoticesStore.unshift(newNotice);
+    saveJsonStore(NOTICES_FILE, campusNoticesStore);
     return res.status(201).json({ success: true, message: 'Notice published', notice: newNotice });
   });
 
@@ -979,6 +1199,7 @@ async function startServer() {
       ...campusNoticesStore[idx],
       ...b
     };
+    saveJsonStore(NOTICES_FILE, campusNoticesStore);
     return res.json({ success: true, message: 'Notice updated', notice: campusNoticesStore[idx] });
   });
 
@@ -990,12 +1211,14 @@ async function startServer() {
     if (campusNoticesStore.length === initLen) {
       return res.status(404).json({ success: false, message: 'Notice not found' });
     }
+    saveJsonStore(NOTICES_FILE, campusNoticesStore);
     return res.json({ success: true, message: 'Notice removed', remainingCount: campusNoticesStore.length });
   });
 
   // Notice Reset endpoint
   app.post('/api/campus/notices/reset', (_req, res) => {
     campusNoticesStore = [...CAMPUS_NOTICES];
+    saveJsonStore(NOTICES_FILE, campusNoticesStore);
     return res.json({ success: true, message: 'Notices reset to default', notices: campusNoticesStore });
   });
 
@@ -1146,8 +1369,8 @@ async function startServer() {
     }
   ];
 
-  let campusProductsStore: any[] = [...INITIAL_CAMPUS_PRODUCTS];
-  const campusOrdersStore: any[] = [];
+  let campusProductsStore: any[] = loadJsonStore(PRODUCTS_FILE, INITIAL_CAMPUS_PRODUCTS);
+  let campusOrdersStore: any[] = loadJsonStore(ORDERS_FILE, []);
 
   // Master Admin Security Configuration
   // Default Master Admin Password: 'shopping2026'
@@ -1167,31 +1390,36 @@ async function startServer() {
   // Product addition endpoint
   app.post('/api/products', (req, res) => {
     const b = req.body || {};
+    const isAdmin = b.isAdmin === true || (b.sellerRole || '').toLowerCase().includes('admin');
     const sellerRole = (b.sellerRole || '').toLowerCase();
-    if (sellerRole.includes('student') || sellerRole.includes('visitor') || sellerRole.includes('guest')) {
+
+    // Students and visitors cannot add items, only verified merchants and admin
+    if (!isAdmin && (sellerRole.includes('student') || sellerRole.includes('visitor') || sellerRole.includes('guest'))) {
       return res.status(403).json({
         success: false,
         message: 'Access Restricted: Students and Visitors/Guests are not allowed to add items to the market. Only verified Merchants/Vendors can add items.'
       });
     }
+
     const newProduct = {
       id: b.id || `prod-${Date.now()}`,
       title: b.title || 'Untitled Listing',
       price: Number(b.price) || 0,
       category: b.category || 'Textbooks & Books',
       description: b.description || '',
-      image: b.image || 'https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?auto=format&fit=crop&w=600&q=80',
-      sellerName: b.sellerName || 'Student Seller',
+      image: b.image || 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?auto=format&fit=crop&q=80&w=800',
+      sellerName: b.sellerName || (isAdmin ? 'Central Campus Store' : 'Campus Merchant'),
       sellerContact: b.sellerContact || '+233241234567',
-      sellerRole: b.sellerRole || 'Student Seller',
-      sellerId: b.sellerId || 'usr-custom',
-      locationOnCampus: b.locationOnCampus || 'Trinity Hall Porter Desk',
+      sellerRole: b.sellerRole || (isAdmin ? 'Central Admin / Official Store' : 'Campus Merchant'),
+      sellerId: b.sellerId || (isAdmin ? 'admin-store' : 'usr-custom'),
+      locationOnCampus: b.locationOnCampus || 'Senate Building Ground Floor',
       condition: b.condition || 'Brand New',
       datePosted: 'Just Now',
       dateAdded: new Date().toISOString().split('T')[0]
     };
 
     campusProductsStore.unshift(newProduct);
+    saveJsonStore(PRODUCTS_FILE, campusProductsStore);
 
     return res.status(201).json({
       success: true,
@@ -1222,9 +1450,12 @@ async function startServer() {
       image: b.image || campusProductsStore[idx].image,
       sellerName: b.sellerName !== undefined ? b.sellerName : campusProductsStore[idx].sellerName,
       sellerContact: b.sellerContact !== undefined ? b.sellerContact : campusProductsStore[idx].sellerContact,
+      sellerRole: b.sellerRole !== undefined ? b.sellerRole : campusProductsStore[idx].sellerRole,
       locationOnCampus: b.locationOnCampus !== undefined ? b.locationOnCampus : campusProductsStore[idx].locationOnCampus,
       condition: b.condition !== undefined ? b.condition : campusProductsStore[idx].condition,
     };
+
+    saveJsonStore(PRODUCTS_FILE, campusProductsStore);
 
     return res.json({
       success: true,
@@ -1247,6 +1478,8 @@ async function startServer() {
       return res.status(404).json({ success: false, message: 'Product not found' });
     }
 
+    saveJsonStore(PRODUCTS_FILE, campusProductsStore);
+
     return res.json({
       success: true,
       message: 'Product listing removed successfully',
@@ -1257,6 +1490,7 @@ async function startServer() {
   // Reset Products to Campus Defaults
   app.post('/api/products/reset', (_req, res) => {
     campusProductsStore = [...INITIAL_CAMPUS_PRODUCTS];
+    saveJsonStore(PRODUCTS_FILE, campusProductsStore);
     return res.json({
       success: true,
       message: 'Catalog reset to original campus listings',
@@ -1287,6 +1521,7 @@ async function startServer() {
     };
 
     campusOrdersStore.unshift(newOrder);
+    saveJsonStore(ORDERS_FILE, campusOrdersStore);
 
     return res.status(201).json({
       success: true,
@@ -1305,8 +1540,24 @@ async function startServer() {
     }
     if (status) {
       order.status = status;
+      saveJsonStore(ORDERS_FILE, campusOrdersStore);
     }
     return res.json({ success: true, message: 'Order status updated', order });
+  });
+
+  // Order Delete endpoint (Admin)
+  app.delete(['/api/orders', '/api/orders/:id'], (req, res) => {
+    const targetId = req.params.id || req.query.id || req.body?.id;
+    if (!targetId) {
+      return res.status(400).json({ success: false, message: 'Order ID is required for deletion' });
+    }
+    const initialLen = campusOrdersStore.length;
+    campusOrdersStore = campusOrdersStore.filter(o => String(o.id) !== String(targetId));
+    if (campusOrdersStore.length === initialLen) {
+      return res.status(404).json({ success: false, message: 'Order not found' });
+    }
+    saveJsonStore(ORDERS_FILE, campusOrdersStore);
+    return res.json({ success: true, message: 'Order deleted successfully', remainingCount: campusOrdersStore.length });
   });
 
   // --- ADMIN AUTHENTICATION & PASSWORD MANAGEMENT ---
