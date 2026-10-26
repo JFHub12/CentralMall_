@@ -33,6 +33,9 @@ export interface Product {
   dateAdded?: string;
   datePosted?: string;
   condition: 'Brand New' | 'Like New' | 'Fair';
+  sizes?: ('S' | 'M' | 'L' | 'XL' | 'XXL' | string)[];
+  colors?: ('black' | 'slate' | 'navy' | 'white' | 'beige' | 'olive' | string)[];
+  colorNames?: string[];
 }
 
 export interface CartItem {
