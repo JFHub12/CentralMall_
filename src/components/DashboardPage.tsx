@@ -473,20 +473,30 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
             transition={{ type: 'spring', stiffness: 300 }}
             onClick={() => onSelectOption('shop')}
             id="dashboard-card-shop"
-            className="neon-cu-card rounded-3xl p-6 md:p-8 backdrop-blur-xl shadow-xl transition-all cursor-pointer flex flex-col justify-between overflow-hidden text-left border group"
+            className={`rounded-3xl p-6 md:p-8 backdrop-blur-xl shadow-xl transition-all cursor-pointer flex flex-col justify-between overflow-hidden text-left border group ${
+              isDark
+                ? 'neon-cu-card border-slate-800'
+                : 'bg-white border-red-200/80 shadow-red-100/50 hover:shadow-2xl hover:border-[#CE1126]'
+            }`}
           >
             <div>
-              <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-5 bg-[#ff073a]/20 border border-[#ff073a]/50 text-[#ff073a] group-hover:bg-[#ff073a] group-hover:text-white transition-colors duration-300 shadow-[0_0_15px_rgba(255,7,58,0.35)]">
+              <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-5 transition-colors duration-300 ${
+                isDark
+                  ? 'bg-[#ff073a]/20 border border-[#ff073a]/50 text-[#ff073a] group-hover:bg-[#ff073a] group-hover:text-white shadow-[0_0_15px_rgba(255,7,58,0.35)]'
+                  : 'bg-red-50 border border-red-200 text-[#CE1126] group-hover:bg-[#CE1126] group-hover:text-white shadow-sm'
+              }`}>
                 <ShoppingBag className="w-7 h-7" />
               </div>
-              <div className="flex items-center gap-1.5 text-xs font-bold text-[#ff073a] mb-1">
+              <div className={`flex items-center gap-1.5 text-xs font-bold mb-1 ${isDark ? 'text-[#ff073a]' : 'text-[#CE1126]'}`}>
                 <span>Central Marketplace</span>
                 <Sparkles className="w-3 h-3 text-[#D4AF37]" />
               </div>
-              <h3 className="text-xl font-black mb-2 text-white group-hover:text-[#ff073a] transition-colors">
+              <h3 className={`text-xl font-black mb-2 transition-colors ${
+                isDark ? 'text-white group-hover:text-[#ff073a]' : 'text-slate-900 group-hover:text-[#CE1126]'
+              }`}>
                 Marketplace & Sell
               </h3>
-              <p className="text-xs font-medium leading-relaxed mb-4 text-slate-300">
+              <p className={`text-xs font-medium leading-relaxed mb-4 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
                 {user.role === 'merchant'
                   ? 'List textbooks, laptops, apparel, and food with photos. Open to verified merchants with instant MoMo and WhatsApp chat.'
                   : 'Browse textbooks, laptops, apparel, and food with instant MoMo and WhatsApp chat. Buying mode for students and visitors.'}
@@ -506,16 +516,20 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                     <PlusCircle className="w-3 h-3" />
                     <span>+ Sell an Item Now</span>
                   </button>
-                  <span className="text-[10px] text-gray-400 font-bold">Verified merchant listing</span>
+                  <span className={`text-[10px] font-bold ${isDark ? 'text-gray-400' : 'text-slate-500'}`}>Verified merchant listing</span>
                 </div>
               )}
             </div>
 
-            <div className="flex items-center justify-between pt-4 border-t border-gray-800/80">
-              <span className="text-xs font-extrabold text-slate-300 group-hover:text-[#ff073a] transition-colors">
+            <div className={`flex items-center justify-between pt-4 border-t ${isDark ? 'border-gray-800/80' : 'border-slate-100'}`}>
+              <span className={`text-xs font-extrabold transition-colors ${
+                isDark ? 'text-slate-300 group-hover:text-[#ff073a]' : 'text-slate-700 group-hover:text-[#CE1126]'
+              }`}>
                 Explore Marketplace & Buy
               </span>
-              <div className="w-8 h-8 rounded-full flex items-center justify-center transition-colors bg-gray-800 text-slate-300 group-hover:bg-[#ff073a] group-hover:text-white">
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${
+                isDark ? 'bg-gray-800 text-slate-300 group-hover:bg-[#ff073a] group-hover:text-white' : 'bg-slate-100 text-slate-700 group-hover:bg-[#CE1126] group-hover:text-white'
+              }`}>
                 <ChevronRight className="w-4 h-4" />
               </div>
             </div>
@@ -527,29 +541,43 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
             transition={{ type: 'spring', stiffness: 300 }}
             onClick={() => onSelectOption('gps')}
             id="dashboard-card-gps"
-            className="neon-cu-card rounded-3xl p-6 md:p-8 backdrop-blur-xl shadow-xl transition-all cursor-pointer flex flex-col justify-between overflow-hidden text-left border group"
+            className={`rounded-3xl p-6 md:p-8 backdrop-blur-xl shadow-xl transition-all cursor-pointer flex flex-col justify-between overflow-hidden text-left border group ${
+              isDark
+                ? 'neon-cu-card border-slate-800'
+                : 'bg-white border-red-200/80 shadow-red-100/50 hover:shadow-2xl hover:border-[#CE1126]'
+            }`}
           >
             <div>
-              <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-5 bg-[#002147] border border-blue-400/50 text-blue-300 group-hover:bg-[#ff073a] group-hover:text-white transition-colors duration-300 shadow-[0_0_15px_rgba(0,33,71,0.5)]">
+              <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-5 transition-colors duration-300 ${
+                isDark
+                  ? 'bg-[#002147] border border-blue-400/50 text-blue-300 group-hover:bg-[#ff073a] group-hover:text-white shadow-[0_0_15px_rgba(0,33,71,0.5)]'
+                  : 'bg-blue-50 border border-blue-200 text-[#002147] group-hover:bg-[#CE1126] group-hover:text-white shadow-sm'
+              }`}>
                 <Navigation className="w-7 h-7" />
               </div>
-              <div className="flex items-center gap-1.5 text-xs font-bold text-rose-400 mb-1">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-rose-500 mb-1">
                 <span>Campus Road GPS</span>
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
               </div>
-              <h3 className="text-xl font-black mb-2 text-white group-hover:text-[#ff073a] transition-colors">
+              <h3 className={`text-xl font-black mb-2 transition-colors ${
+                isDark ? 'text-white group-hover:text-[#ff073a]' : 'text-slate-900 group-hover:text-[#CE1126]'
+              }`}>
                 Campus GPS & Directions
               </h3>
-              <p className="text-xs font-medium leading-relaxed mb-6 text-slate-300">
+              <p className={`text-xs font-medium leading-relaxed mb-6 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
                 Step-by-step road navigation with clear lanes, turn-by-turn guidance, and live vehicle tracking across Central University Miotso.
               </p>
             </div>
 
-            <div className="flex items-center justify-between pt-4 border-t border-gray-800/80">
-              <span className="text-xs font-extrabold text-slate-300 group-hover:text-[#ff073a] transition-colors">
+            <div className={`flex items-center justify-between pt-4 border-t ${isDark ? 'border-gray-800/80' : 'border-slate-100'}`}>
+              <span className={`text-xs font-extrabold transition-colors ${
+                isDark ? 'text-slate-300 group-hover:text-[#ff073a]' : 'text-slate-700 group-hover:text-[#CE1126]'
+              }`}>
                 Get Campus Directions
               </span>
-              <div className="w-8 h-8 rounded-full flex items-center justify-center transition-colors bg-gray-800 text-slate-300 group-hover:bg-[#ff073a] group-hover:text-white">
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${
+                isDark ? 'bg-gray-800 text-slate-300 group-hover:bg-[#ff073a] group-hover:text-white' : 'bg-slate-100 text-slate-700 group-hover:bg-[#CE1126] group-hover:text-white'
+              }`}>
                 <ChevronRight className="w-4 h-4" />
               </div>
             </div>
@@ -561,41 +589,59 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
             transition={{ type: 'spring', stiffness: 300 }}
             onClick={() => onSelectOption('clinic')}
             id="dashboard-card-clinic"
-            className="neon-cu-card rounded-3xl p-6 md:p-8 backdrop-blur-xl shadow-xl transition-all cursor-pointer flex flex-col justify-between overflow-hidden text-left border group"
+            className={`rounded-3xl p-6 md:p-8 backdrop-blur-xl shadow-xl transition-all cursor-pointer flex flex-col justify-between overflow-hidden text-left border group ${
+              isDark
+                ? 'neon-cu-card border-slate-800'
+                : 'bg-white border-red-200/80 shadow-red-100/50 hover:shadow-2xl hover:border-[#CE1126]'
+            }`}
           >
             <div>
-              <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-5 bg-emerald-950/60 border border-emerald-500/40 text-emerald-400 group-hover:bg-[#ff073a] group-hover:text-white transition-colors duration-300 shadow-[0_0_15px_rgba(16,185,129,0.3)]">
+              <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-5 transition-colors duration-300 ${
+                isDark
+                  ? 'bg-emerald-950/60 border border-emerald-500/40 text-emerald-400 group-hover:bg-[#ff073a] group-hover:text-white shadow-[0_0_15px_rgba(16,185,129,0.3)]'
+                  : 'bg-emerald-50 border border-emerald-200 text-emerald-700 group-hover:bg-[#CE1126] group-hover:text-white shadow-sm'
+              }`}>
                 <Stethoscope className="w-7 h-7" />
               </div>
-              <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-400 mb-1">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-600 mb-1">
                 <span>Ghana Health Service (GHS)</span>
-                <span className="text-[10px] px-1.5 py-0.2 rounded font-bold bg-emerald-950 text-emerald-300 border border-emerald-800">
+                <span className={`text-[10px] px-1.5 py-0.2 rounded font-bold ${
+                  isDark ? 'bg-emerald-950 text-emerald-300 border border-emerald-800' : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                }`}>
                   NHIS
                 </span>
               </div>
-              <h3 className="text-xl font-black mb-2 text-white group-hover:text-[#ff073a] transition-colors">
+              <h3 className={`text-xl font-black mb-2 transition-colors ${
+                isDark ? 'text-white group-hover:text-[#ff073a]' : 'text-slate-900 group-hover:text-[#CE1126]'
+              }`}>
                 School Clinic & Triage
               </h3>
-              <p className="text-xs font-medium leading-relaxed mb-6 text-slate-300">
+              <p className={`text-xs font-medium leading-relaxed mb-6 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
                 24/7 medical triage based on GHS clinical protocols, malaria rapid diagnosis, emergency ambulance dispatch, and doctor appointments.
               </p>
             </div>
 
-            <div className="flex items-center justify-between pt-4 border-t border-gray-800/80">
-              <span className="text-xs font-extrabold text-slate-300 group-hover:text-[#ff073a] transition-colors">
+            <div className={`flex items-center justify-between pt-4 border-t ${isDark ? 'border-gray-800/80' : 'border-slate-100'}`}>
+              <span className={`text-xs font-extrabold transition-colors ${
+                isDark ? 'text-slate-300 group-hover:text-[#ff073a]' : 'text-slate-700 group-hover:text-[#CE1126]'
+              }`}>
                 Consult Clinic Nurse
               </span>
-              <div className="w-8 h-8 rounded-full flex items-center justify-center transition-colors bg-gray-800 text-slate-300 group-hover:bg-[#ff073a] group-hover:text-white">
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${
+                isDark ? 'bg-gray-800 text-slate-300 group-hover:bg-[#ff073a] group-hover:text-white' : 'bg-slate-100 text-slate-700 group-hover:bg-[#CE1126] group-hover:text-white'
+              }`}>
                 <ChevronRight className="w-4 h-4" />
               </div>
             </div>
           </motion.div>
         </div>
 
-        {/* Official Campus Updates & Notices from central.edu.gh */}
-        <div className="mt-8">
-          <CampusUpdatesCard onNavigateToOption={onSelectOption} refreshTrigger={refreshTrigger} />
-        </div>
+        {/* Official Campus Updates & Notices from central.edu.gh - Shown ONLY to Students */}
+        {user.role === 'student' && (
+          <div className="mt-8">
+            <CampusUpdatesCard onNavigateToOption={onSelectOption} refreshTrigger={refreshTrigger} />
+          </div>
+        )}
       </div>
 
       {/* Footer */}

@@ -752,6 +752,7 @@ export const ShopView: React.FC<ShopViewProps> = ({
             <div className={`grid grid-cols-1 sm:grid-cols-2 ${isClothingDepartment ? 'xl:grid-cols-3' : 'lg:grid-cols-3'} gap-6`}>
               {filteredProducts.map((product) => {
                 const isUserOwner = product.sellerId === user?.id || product.sellerName === user?.name;
+                const canUserEdit = user?.role === 'merchant';
 
                 return (
                   <motion.div
@@ -781,33 +782,35 @@ export const ShopView: React.FC<ShopViewProps> = ({
                         </div>
 
                         {/* Edit & Delete Action Buttons directly on image */}
-                        <div className="absolute top-3 right-3 flex items-center gap-1.5 z-10">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleOpenEdit(product);
-                            }}
-                            id={`edit-product-${product.id}`}
-                            className="bg-white/95 hover:bg-[#CE1126] text-slate-800 hover:text-white p-1.5 rounded-full shadow-md backdrop-blur-sm border border-slate-200 hover:border-[#CE1126] transition-colors cursor-pointer flex items-center gap-1 px-2.5 text-[11px] font-bold"
-                            title="Edit this item (Picture, Price, Details)"
-                          >
-                            <Edit3 className="w-3.5 h-3.5 text-amber-500 group-hover:text-white" />
-                            <span>Edit</span>
-                          </button>
-
-                          {isUserOwner && (
+                        {canUserEdit && (
+                          <div className="absolute top-3 right-3 flex items-center gap-1.5 z-10">
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
-                                handleDeleteProduct(product.id);
+                                handleOpenEdit(product);
                               }}
-                              className="bg-white/95 hover:bg-red-600 text-red-600 hover:text-white p-1.5 rounded-full shadow-md backdrop-blur-sm border border-red-200 transition-colors cursor-pointer"
-                              title="Delete Listing"
+                              id={`edit-product-${product.id}`}
+                              className="bg-white/95 hover:bg-[#CE1126] text-slate-800 hover:text-white p-1.5 rounded-full shadow-md backdrop-blur-sm border border-slate-200 hover:border-[#CE1126] transition-colors cursor-pointer flex items-center gap-1 px-2.5 text-[11px] font-bold"
+                              title="Edit this item (Picture, Price, Details)"
                             >
-                              <Trash2 className="w-3.5 h-3.5" />
+                              <Edit3 className="w-3.5 h-3.5 text-amber-500 group-hover:text-white" />
+                              <span>Edit</span>
                             </button>
-                          )}
-                        </div>
+
+                            {isUserOwner && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteProduct(product.id);
+                                }}
+                                className="bg-white/95 hover:bg-red-600 text-red-600 hover:text-white p-1.5 rounded-full shadow-md backdrop-blur-sm border border-red-200 transition-colors cursor-pointer"
+                                title="Delete Listing"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
+                        )}
 
                         {/* Condition Badge Bottom Right of Image */}
                         <div className="absolute bottom-3 right-3 bg-slate-900/80 text-white text-[10px] font-bold px-2.5 py-1 rounded-full shadow-sm backdrop-blur-sm">
@@ -941,15 +944,17 @@ export const ShopView: React.FC<ShopViewProps> = ({
                     </div>
 
                     {/* Action Buttons */}
-                    <div className="p-5 pt-0 grid grid-cols-2 gap-2">
-                      <button
-                        onClick={() => handleOpenEdit(product)}
-                        id={`btn-edit-item-${product.id}`}
-                        className="py-2 bg-slate-100 hover:bg-red-50 border border-slate-200 hover:border-red-200 text-slate-800 hover:text-[#CE1126] font-bold text-xs rounded-full transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-                      >
-                        <Edit3 className="w-3.5 h-3.5" />
-                        <span>Edit Item</span>
-                      </button>
+                    <div className={`p-5 pt-0 grid ${canUserEdit ? 'grid-cols-2' : 'grid-cols-1'} gap-2`}>
+                      {canUserEdit && (
+                        <button
+                          onClick={() => handleOpenEdit(product)}
+                          id={`btn-edit-item-${product.id}`}
+                          className="py-2 bg-slate-100 hover:bg-red-50 border border-slate-200 hover:border-red-200 text-slate-800 hover:text-[#CE1126] font-bold text-xs rounded-full transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                        >
+                          <Edit3 className="w-3.5 h-3.5" />
+                          <span>Edit Item</span>
+                        </button>
+                      )}
 
                       <button
                         onClick={() => addToCart(product)}

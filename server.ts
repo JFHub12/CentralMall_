@@ -130,8 +130,9 @@ interface OpenRouterChatMessage {
   content: string;
 }
 
-const CENTRAL_CAMPUS_SYSTEM_PROMPT = `You are Central AI, the official and intelligent campus AI assistant for Central University Ghana (http://central.edu.gh/), Miotso Main Campus.
-You provide comprehensive, helpful, friendly, and accurate answers to students, faculty, applicants, and campus visitors.
+const CENTRAL_CAMPUS_SYSTEM_PROMPT = `You are Central AI, a brilliant, comprehensive, and versatile general-purpose AI assistant as well as the official campus AI guide for Central University Ghana (http://central.edu.gh/), Miotso Main Campus.
+You can answer ANY question the user asks — whether it is about computer science, mathematics, physics, history, programming, literature, general knowledge, or Central University admissions, faculties, hostels, and campus GPS.
+Provide accurate, detailed, well-structured, and helpful answers tailored precisely to whatever the user asks.
 
 Official Knowledge Base for Central University (Miotso Main Campus):
 - Chancellor: Dr. Mensa Otabil; Vice-Chancellor: Prof. Bill Buenar Puplampu.
@@ -322,18 +323,55 @@ Feel free to ask any question!`;
 • **Operating Hours:** 7:00 AM – 9:00 PM daily.`;
   }
 
+  // General Programming & Code questions
+  if (q.includes('python') || q.includes('javascript') || q.includes('code') || q.includes('programming') || q.includes('function') || q.includes('bug') || q.includes('algorithm') || q.includes('react') || q.includes('typescript')) {
+    return `💻 **Central AI Coding & Tech Assistant:**
+    
+Here is assistance regarding your programming inquiry:
+• **Languages supported:** Python, JavaScript, TypeScript, Java, C++, SQL, React.
+• **Best practices:** Structure code modularly, write clean error handling, and follow robust software engineering patterns.
+• **Academic Support:** For computer science and IT students at Central University Miotso campus, utilize our campus computer labs and electronic journals.
+
+How else can I help you with your code or software project today?`;
+  }
+
+  // Mathematics & Calculations
+  if (q.includes('math') || q.includes('calculate') || q.includes('equation') || q.includes('algebra') || q.includes('calculus') || q.includes('solve') || q.includes('maths')) {
+    return `📐 **Central AI Mathematical & Analytical Assistant:**
+    
+I can assist with mathematics, statistics, calculus, algebra, and business finance formulas.
+• **Guidance:** Please share the specific equation, theorem, or calculation problem you are working on.
+• **Business & Finance:** For Central Business School students, I can assist with financial mathematics, amortization, and economic statistics.`;
+  }
+
+  // Science, History & General Research
+  if (q.includes('history') || q.includes('science') || q.includes('physics') || q.includes('chemistry') || q.includes('biology') || q.includes('geography') || q.includes('economy') || q.includes('explain') || q.includes('what is') || q.includes('how does') || q.includes('why')) {
+    return `🔬 **Central AI General Knowledge & Research Assistant:**
+    
+You asked: *"<strong>${query}</strong>"*
+
+Here is a comprehensive overview:
+• **Comprehensive Breakdown:** I provide detailed, well-structured explanations for scientific principles, historical events, economic concepts, and academic research queries.
+• **Research Resources:** Central University students can access our digital library and electronic journal databases for deep academic reading.
+
+Feel free to ask follow-up questions or request deeper details on any aspect of this topic!`;
+  }
+
   return `🏛️ **Central AI Assistant (Central University Ghana):**
 
-Hello! I am your AI campus guide for Central University Miotso Main Campus (http://central.edu.gh/).
+Hello! I am your AI campus guide and general knowledge assistant for Central University Miotso Main Campus (http://central.edu.gh/).
 
-I can help you with:
+You asked: *"<strong>${query}</strong>"*
+
+I can answer any question you have, including:
+• **General Knowledge & Research:** History, science, mathematics, literature, and technology.
 • **Admissions & Requirements:** Cut-off points, e-vouchers, mature student applications.
 • **Faculties & Programs:** Business, Law, Pharmacy, Nursing, Computer Science.
 • **Campus Life & Facilities:** Trinity Hall, Destiny Hall, Central Library, Campus Clinic.
 • **Central Mall Marketplace:** Buying, selling products, uploading pictures, MoMo payments.
 • **Navigation:** Interactive Campus GPS points of interest.
 
-What would you like to know today?`;
+What would you like to know or explore today?`;
 }
 
 function getFallbackClinicReply(query: string): { reply: string; suggestedActions: string[] } {
