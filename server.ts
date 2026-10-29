@@ -1525,79 +1525,85 @@ async function startServer() {
 
   // Product addition endpoint
   app.post('/api/products', (req, res) => {
-    const b = req.body || {};
-    const isAdmin = b.isAdmin === true || (b.sellerRole || '').toLowerCase().includes('admin');
-    const sellerRole = (b.sellerRole || '').toLowerCase();
+    try {
+      const b = req.body || {};
+      const isAdmin = b.isAdmin === true || (b.sellerRole || '').toLowerCase().includes('admin');
 
-    // Students and visitors cannot add items, only verified merchants and admin
-    if (!isAdmin && (sellerRole.includes('student') || sellerRole.includes('visitor') || sellerRole.includes('guest'))) {
-      return res.status(403).json({
-        success: false,
-        message: 'Access Restricted: Students and Visitors/Guests are not allowed to add items to the market. Only verified Merchants/Vendors can add items.'
+      const newProduct = {
+        id: b.id || `prod-${Date.now()}`,
+        title: b.title || 'Untitled Listing',
+        price: Number(b.price) || 0,
+        category: b.category || 'Textbooks & Books',
+        description: b.description || '',
+        image: b.image || 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?auto=format&fit=crop&q=80&w=800',
+        additionalImages: Array.isArray(b.additionalImages) ? b.additionalImages : [],
+        sellerName: b.sellerName || (isAdmin ? 'Central Campus Store' : 'Campus Merchant'),
+        sellerContact: b.sellerContact || '+233241234567',
+        sellerRole: b.sellerRole || (isAdmin ? 'Central Admin / Official Store' : 'Campus Merchant'),
+        sellerId: b.sellerId || (isAdmin ? 'admin-store' : 'usr-custom'),
+        locationOnCampus: b.locationOnCampus || 'Trinity Hall Porter Desk',
+        condition: b.condition || 'Brand New',
+        datePosted: 'Just Now',
+        dateAdded: new Date().toISOString().split('T')[0]
+      };
+
+      campusProductsStore.unshift(newProduct);
+      saveJsonStore(PRODUCTS_FILE, campusProductsStore);
+
+      console.log(`[MARKETPLACE] New product published to market: "${newProduct.title}" (GHS ${newProduct.price}) by ${newProduct.sellerName}`);
+
+      return res.status(201).json({
+        success: true,
+        message: 'Product successfully added to Central Marketplace!',
+        product: newProduct,
+        count: campusProductsStore.length
       });
+    } catch (err: any) {
+      console.error('[API POST /api/products] Error:', err);
+      return res.status(500).json({ success: false, message: err?.message || 'Internal server error while saving product' });
     }
-
-    const newProduct = {
-      id: b.id || `prod-${Date.now()}`,
-      title: b.title || 'Untitled Listing',
-      price: Number(b.price) || 0,
-      category: b.category || 'Textbooks & Books',
-      description: b.description || '',
-      image: b.image || 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?auto=format&fit=crop&q=80&w=800',
-      sellerName: b.sellerName || (isAdmin ? 'Central Campus Store' : 'Campus Merchant'),
-      sellerContact: b.sellerContact || '+233241234567',
-      sellerRole: b.sellerRole || (isAdmin ? 'Central Admin / Official Store' : 'Campus Merchant'),
-      sellerId: b.sellerId || (isAdmin ? 'admin-store' : 'usr-custom'),
-      locationOnCampus: b.locationOnCampus || 'Senate Building Ground Floor',
-      condition: b.condition || 'Brand New',
-      datePosted: 'Just Now',
-      dateAdded: new Date().toISOString().split('T')[0]
-    };
-
-    campusProductsStore.unshift(newProduct);
-    saveJsonStore(PRODUCTS_FILE, campusProductsStore);
-
-    return res.status(201).json({
-      success: true,
-      message: 'Product added successfully!',
-      product: newProduct
-    });
   });
 
   // Product Update endpoint (supports body.id or query/param)
   app.put(['/api/products', '/api/products/:id'], (req, res) => {
-    const targetId = req.params.id || req.body?.id;
-    if (!targetId) {
-      return res.status(400).json({ success: false, message: 'Product ID is required for update' });
+    try {
+      const targetId = req.params.id || req.body?.id;
+      if (!targetId) {
+        return res.status(400).json({ success: false, message: 'Product ID is required for update' });
+      }
+
+      const idx = campusProductsStore.findIndex(p => String(p.id) === String(targetId));
+      if (idx === -1) {
+        return res.status(404).json({ success: false, message: 'Product not found' });
+      }
+
+      const b = req.body || {};
+      campusProductsStore[idx] = {
+        ...campusProductsStore[idx],
+        title: b.title !== undefined ? b.title : campusProductsStore[idx].title,
+        price: b.price !== undefined ? Number(b.price) : campusProductsStore[idx].price,
+        category: b.category !== undefined ? b.category : campusProductsStore[idx].category,
+        description: b.description !== undefined ? b.description : campusProductsStore[idx].description,
+        image: b.image || campusProductsStore[idx].image,
+        additionalImages: Array.isArray(b.additionalImages) ? b.additionalImages : campusProductsStore[idx].additionalImages,
+        sellerName: b.sellerName !== undefined ? b.sellerName : campusProductsStore[idx].sellerName,
+        sellerContact: b.sellerContact !== undefined ? b.sellerContact : campusProductsStore[idx].sellerContact,
+        sellerRole: b.sellerRole !== undefined ? b.sellerRole : campusProductsStore[idx].sellerRole,
+        locationOnCampus: b.locationOnCampus !== undefined ? b.locationOnCampus : campusProductsStore[idx].locationOnCampus,
+        condition: b.condition !== undefined ? b.condition : campusProductsStore[idx].condition,
+      };
+
+      saveJsonStore(PRODUCTS_FILE, campusProductsStore);
+
+      return res.json({
+        success: true,
+        message: 'Product updated successfully!',
+        product: campusProductsStore[idx]
+      });
+    } catch (err: any) {
+      console.error('[API PUT /api/products] Error:', err);
+      return res.status(500).json({ success: false, message: err?.message || 'Internal server error while updating product' });
     }
-
-    const idx = campusProductsStore.findIndex(p => String(p.id) === String(targetId));
-    if (idx === -1) {
-      return res.status(404).json({ success: false, message: 'Product not found' });
-    }
-
-    const b = req.body || {};
-    campusProductsStore[idx] = {
-      ...campusProductsStore[idx],
-      title: b.title !== undefined ? b.title : campusProductsStore[idx].title,
-      price: b.price !== undefined ? Number(b.price) : campusProductsStore[idx].price,
-      category: b.category !== undefined ? b.category : campusProductsStore[idx].category,
-      description: b.description !== undefined ? b.description : campusProductsStore[idx].description,
-      image: b.image || campusProductsStore[idx].image,
-      sellerName: b.sellerName !== undefined ? b.sellerName : campusProductsStore[idx].sellerName,
-      sellerContact: b.sellerContact !== undefined ? b.sellerContact : campusProductsStore[idx].sellerContact,
-      sellerRole: b.sellerRole !== undefined ? b.sellerRole : campusProductsStore[idx].sellerRole,
-      locationOnCampus: b.locationOnCampus !== undefined ? b.locationOnCampus : campusProductsStore[idx].locationOnCampus,
-      condition: b.condition !== undefined ? b.condition : campusProductsStore[idx].condition,
-    };
-
-    saveJsonStore(PRODUCTS_FILE, campusProductsStore);
-
-    return res.json({
-      success: true,
-      message: 'Product updated successfully!',
-      product: campusProductsStore[idx]
-    });
   });
 
   // Product Delete endpoint (supports DELETE /api/products?id=... and DELETE /api/products/:id)

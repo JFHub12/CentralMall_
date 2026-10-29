@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Shield, Key, Lock, Unlock, X, Plus, Edit2, Trash2, RefreshCw,
-  ShoppingBag, Check, AlertCircle, Eye, EyeOff, Sparkles, Download,
+  ShoppingBag, Check, AlertCircle, Eye, EyeOff, Sparkles, Download, Upload,
   ExternalLink, Layers, Search, Bell, Clock, Stethoscope, ChevronRight,
   TrendingUp, Copy, CheckCircle2, RotateCcw, Monitor, Smartphone, Globe
 } from 'lucide-react';
@@ -63,6 +63,7 @@ export const AdminConsoleModal: React.FC<AdminConsoleModalProps> = ({
   const [formSellerContact, setFormSellerContact] = useState('+233241234567');
   const [formLocation, setFormLocation] = useState('Senate Building Ground Floor');
   const [formCondition, setFormCondition] = useState<'Brand New' | 'Like New' | 'Fair'>('Brand New');
+  const [formAdditionalImages, setFormAdditionalImages] = useState<string[]>(['', '', '', '']);
   const [actionNotice, setActionNotice] = useState<string | null>(null);
 
   // Deletion Confirmation Modal State (Reliable without window.confirm)
@@ -300,7 +301,7 @@ export const AdminConsoleModal: React.FC<AdminConsoleModalProps> = ({
     setPasswordInput('');
   };
 
-  // Image file handler for Add / Edit product
+  // Image file handler for Add / Edit product main photo
   const handleProductImageFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -309,6 +310,23 @@ export const AdminConsoleModal: React.FC<AdminConsoleModalProps> = ({
         const result = reader.result as string;
         setFormImagePreview(result);
         setFormImage(result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  // Image file handler for additional preview photos (#2, #3, #4, #5)
+  const handleAdditionalImageFile = (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const result = reader.result as string;
+        setFormAdditionalImages((prev) => {
+          const updated = [...prev];
+          updated[index] = result;
+          return updated;
+        });
       };
       reader.readAsDataURL(file);
     }
@@ -327,6 +345,10 @@ export const AdminConsoleModal: React.FC<AdminConsoleModalProps> = ({
     setFormSellerContact(prod.sellerContact);
     setFormLocation(prod.locationOnCampus || 'Miotso Campus');
     setFormCondition(prod.condition || 'Brand New');
+    const addImgs = prod.additionalImages ? [...prod.additionalImages] : ['', '', '', ''];
+    while (addImgs.length < 4) addImgs.push('');
+    setFormAdditionalImages(addImgs.slice(0, 4));
+    setIsAddModalOpen(true);
   };
 
   // Open Add Product Modal
@@ -342,6 +364,7 @@ export const AdminConsoleModal: React.FC<AdminConsoleModalProps> = ({
     setFormSellerContact('+233241234567');
     setFormLocation('Senate Building Ground Floor');
     setFormCondition('Brand New');
+    setFormAdditionalImages(['', '', '', '']);
     setIsAddModalOpen(true);
   };
 
@@ -350,6 +373,8 @@ export const AdminConsoleModal: React.FC<AdminConsoleModalProps> = ({
     e.preventDefault();
     if (!formTitle.trim() || !formPrice) return;
 
+    const filteredAdditionalImages = formAdditionalImages.map(img => img.trim()).filter(Boolean);
+
     const payload = {
       id: editingProduct ? editingProduct.id : `prod-${Date.now()}`,
       title: formTitle.trim(),
@@ -357,6 +382,7 @@ export const AdminConsoleModal: React.FC<AdminConsoleModalProps> = ({
       category: formCategory,
       description: formDescription.trim(),
       image: formImagePreview || formImage || 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?auto=format&fit=crop&q=80&w=800',
+      additionalImages: filteredAdditionalImages,
       sellerName: formSellerName.trim() || 'Central Campus Store',
       sellerContact: formSellerContact.trim() || '+233241234567',
       sellerRole: 'Central Admin / Official Store',
@@ -382,9 +408,15 @@ export const AdminConsoleModal: React.FC<AdminConsoleModalProps> = ({
         loadProducts();
         if (onProductsUpdated) onProductsUpdated();
         window.dispatchEvent(new CustomEvent('central_mall_content_updated', { detail: { type: 'product' } }));
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        setActionNotice(errData.message || 'Failed to save product. Please check input or image size.');
+        setTimeout(() => setActionNotice(null), 4000);
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error('Error saving product', e);
+      setActionNotice(e?.message || 'Network or server connection error. Please try again.');
+      setTimeout(() => setActionNotice(null), 4000);
     }
   };
 
@@ -1946,6 +1978,70 @@ export const AdminConsoleModal: React.FC<AdminConsoleModalProps> = ({
                     </div>
                   </div>
 
+                  {/* Additional Preview Pictures (Up to 4 Additional Photos for Gallery) */}
+                  <div className="space-y-2 pt-2 border-t border-gray-800">
+                    <label className="block text-xs font-semibold text-gray-300">
+                      Additional Preview Pictures (Up to 4 Additional Photos for Item Preview Gallery)
+                    </label>
+                    <div className="space-y-2">
+                      {formAdditionalImages.map((addImg, idx) => (
+                        <div key={idx} className="p-2 bg-gray-950/80 border border-gray-800 rounded-2xl flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                          <span className="text-[10px] text-gray-400 font-mono font-bold shrink-0">#{idx + 2}</span>
+                          
+                          {addImg ? (
+                            <img
+                              src={addImg}
+                              alt={`Preview ${idx + 2}`}
+                              className="w-9 h-9 rounded-xl object-cover border border-[#ff073a]/60 shrink-0 shadow-sm"
+                            />
+                          ) : (
+                            <div className="w-9 h-9 rounded-xl bg-gray-900 border border-gray-800 flex items-center justify-center text-[9px] text-gray-500 shrink-0 font-mono">
+                              No Pic
+                            </div>
+                          )}
+
+                          <input
+                            type="text"
+                            value={addImg}
+                            onChange={(e) => {
+                              const updated = [...formAdditionalImages];
+                              updated[idx] = e.target.value;
+                              setFormAdditionalImages(updated);
+                            }}
+                            placeholder={`Paste URL or choose file from laptop...`}
+                            className="flex-1 px-3 py-1.5 bg-gray-900 border border-gray-700 rounded-xl text-xs text-white focus:outline-none focus:border-[#ff073a]"
+                          />
+
+                          <label className="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-rose-300 font-bold text-xs rounded-xl cursor-pointer border border-gray-700 shrink-0 flex items-center justify-center gap-1.5 transition-colors">
+                            <Upload className="w-3.5 h-3.5 text-[#ff073a]" />
+                            <span>Choose File</span>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={(e) => handleAdditionalImageFile(idx, e)}
+                              className="hidden"
+                            />
+                          </label>
+
+                          {addImg && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const updated = [...formAdditionalImages];
+                                updated[idx] = '';
+                                setFormAdditionalImages(updated);
+                              }}
+                              className="p-1 rounded-lg text-gray-400 hover:text-rose-400 shrink-0 cursor-pointer"
+                              title="Clear photo"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="block text-xs font-semibold text-gray-300 mb-1">Seller Name</label>
@@ -1982,7 +2078,7 @@ export const AdminConsoleModal: React.FC<AdminConsoleModalProps> = ({
                       type="submit"
                       className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-[#ff073a] hover:bg-[#d4002e] shadow-[0_0_15px_rgba(255,7,58,0.4)]"
                     >
-                      {editingProduct ? 'Save Modifications' : 'Create Listing'}
+                      Save Modifications
                     </button>
                   </div>
                 </form>

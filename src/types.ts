@@ -25,6 +25,7 @@ export interface Product {
   description: string;
   category: ProductCategory;
   image: string;
+  additionalImages?: string[];
   sellerName: string;
   sellerContact: string;
   sellerRole: string;

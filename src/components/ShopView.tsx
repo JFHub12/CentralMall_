@@ -42,9 +42,25 @@ export const ShopView: React.FC<ShopViewProps> = ({
   // Modals & Drawers
   const [showSellModal, setShowSellModal] = useState(initialOpenSellModal);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [selectedProductForPreview, setSelectedProductForPreview] = useState<Product | null>(null);
+  const [activePreviewImageIndex, setActivePreviewImageIndex] = useState(0);
   const [showCartDrawer, setShowCartDrawer] = useState(false);
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
   const [completedOrder, setCompletedOrder] = useState<Order | null>(null);
+
+  const getProductPictures = (product: Product): string[] => {
+    if (product.additionalImages && product.additionalImages.length > 0) {
+      return [product.image, ...product.additionalImages].slice(0, 5);
+    }
+    const defaultImgs = [
+      product.image,
+      'https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&q=80&w=800',
+      'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&q=80&w=800',
+      'https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?auto=format&fit=crop&q=80&w=800',
+      'https://images.unsplash.com/photo-1546868871-7041f2a55e12?auto=format&fit=crop&q=80&w=800',
+    ];
+    return defaultImgs.slice(0, 5);
+  };
 
   // Cart State
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -56,6 +72,7 @@ export const ShopView: React.FC<ShopViewProps> = ({
   const [description, setDescription] = useState('');
   const [image, setImage] = useState('');
   const [imagePreview, setImagePreview] = useState<string>('');
+  const [additionalImages, setAdditionalImages] = useState<string[]>(['', '', '', '']);
   const [sellerName, setSellerName] = useState(user?.name || '');
   const [sellerContact, setSellerContact] = useState(user?.phone || '');
   const [sellerRole, setSellerRole] = useState<'Student' | 'Campus Merchant' | 'Hostel Resident' | 'Faculty / Staff' | 'Visitor / Alum'>('Student');
@@ -73,6 +90,7 @@ export const ShopView: React.FC<ShopViewProps> = ({
   const [editDescription, setEditDescription] = useState('');
   const [editImage, setEditImage] = useState('');
   const [editImagePreview, setEditImagePreview] = useState<string>('');
+  const [editAdditionalImages, setEditAdditionalImages] = useState<string[]>(['', '', '', '']);
   const [editLocation, setEditLocation] = useState('');
   const [editCondition, setEditCondition] = useState<'Brand New' | 'Like New' | 'Fair'>('Brand New');
   const [editContact, setEditContact] = useState('');
@@ -172,6 +190,40 @@ export const ShopView: React.FC<ShopViewProps> = ({
     }
   };
 
+  // Handle file uploads for additional preview pictures in Sell Modal
+  const handleAdditionalImageFileUpload = (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const resultStr = reader.result as string;
+        setAdditionalImages((prev) => {
+          const next = [...prev];
+          next[index] = resultStr;
+          return next;
+        });
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  // Handle file uploads for additional preview pictures in Edit Modal
+  const handleEditAdditionalImageFileUpload = (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const resultStr = reader.result as string;
+        setEditAdditionalImages((prev) => {
+          const next = [...prev];
+          next[index] = resultStr;
+          return next;
+        });
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   // Cart Management
   const addToCart = (product: Product) => {
     setCart((prev) => {
@@ -217,6 +269,7 @@ export const ShopView: React.FC<ShopViewProps> = ({
     setStatusMessage(null);
 
     const finalImage = imagePreview || image || 'https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?auto=format&fit=crop&w=600&q=80';
+    const validAddl = additionalImages.filter((img) => img.trim() !== '');
 
     try {
       const res = await fetch('/api/products', {
@@ -228,6 +281,7 @@ export const ShopView: React.FC<ShopViewProps> = ({
           category,
           description: description.trim(),
           image: finalImage,
+          additionalImages: validAddl,
           sellerName: sellerName.trim(),
           sellerContact: sellerContact.trim(),
           sellerRole: sellerRole || (user?.role === 'merchant' ? 'Campus Merchant' : 'Student Seller'),
@@ -239,6 +293,11 @@ export const ShopView: React.FC<ShopViewProps> = ({
 
       if (res.ok) {
         await fetchProducts();
+        window.dispatchEvent(new Event('central_mall_content_updated'));
+        
+        // Reset category view so newly posted item is immediately visible
+        setSelectedCategory('All');
+        setSearchQuery('');
         setShowSellModal(false);
 
         // Reset form
@@ -247,11 +306,16 @@ export const ShopView: React.FC<ShopViewProps> = ({
         setDescription('');
         setImage('');
         setImagePreview('');
-        setStatusMessage('Item posted successfully with your photo!');
-        setTimeout(() => setStatusMessage(null), 3000);
+        setAdditionalImages(['', '', '', '']);
+        setStatusMessage('🎉 Item published live to the Central Marketplace!');
+        setTimeout(() => setStatusMessage(null), 4000);
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        setStatusMessage(errData.message || 'Error publishing item to marketplace. Please try again.');
       }
     } catch (err) {
       console.error('Error listing product', err);
+      setStatusMessage('Network error. Failed to publish item.');
     } finally {
       setSubmittingProduct(false);
     }
@@ -266,6 +330,13 @@ export const ShopView: React.FC<ShopViewProps> = ({
     setEditDescription(product.description || '');
     setEditImage(product.image);
     setEditImagePreview(product.image);
+    const currentAddl = product.additionalImages || [];
+    setEditAdditionalImages([
+      currentAddl[0] || '',
+      currentAddl[1] || '',
+      currentAddl[2] || '',
+      currentAddl[3] || '',
+    ]);
     setEditLocation(product.locationOnCampus || 'Miotso Campus');
     setEditCondition(product.condition || 'Brand New');
     setEditContact(product.sellerContact || user?.phone || '');
@@ -279,6 +350,7 @@ export const ShopView: React.FC<ShopViewProps> = ({
 
     setSubmittingEdit(true);
     const finalImage = editImagePreview || editImage || editingProduct.image;
+    const validAddl = editAdditionalImages.filter((img) => img.trim() !== '');
 
     try {
       const res = await fetch('/api/products', {
@@ -291,6 +363,7 @@ export const ShopView: React.FC<ShopViewProps> = ({
           category: editCategory,
           description: editDescription.trim(),
           image: finalImage,
+          additionalImages: validAddl,
           locationOnCampus: editLocation,
           condition: editCondition,
           sellerContact: editContact,
@@ -759,7 +832,8 @@ export const ShopView: React.FC<ShopViewProps> = ({
                     key={product.id}
                     initial={{ opacity: 0, y: 15 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="group bg-white border border-gray-100 hover:border-red-200 rounded-3xl overflow-hidden shadow-xl shadow-gray-100/80 hover:shadow-2xl hover:shadow-red-100 transition-all hover:-translate-y-1 flex flex-col justify-between"
+                    onClick={() => setSelectedProductForPreview(product)}
+                    className="group bg-white border border-gray-100 hover:border-red-200 rounded-3xl overflow-hidden shadow-xl shadow-gray-100/80 hover:shadow-2xl hover:shadow-red-100 transition-all hover:-translate-y-1 flex flex-col justify-between cursor-pointer"
                   >
                     <div>
                       {/* Product Image & Picture Badges */}
@@ -974,6 +1048,155 @@ export const ShopView: React.FC<ShopViewProps> = ({
       </div>
 
       {/* ======================================================== */}
+      {/* MODAL: PRODUCT PREVIEW & 5-PICTURE GALLERY */}
+      {/* ======================================================== */}
+      <AnimatePresence>
+        {selectedProductForPreview && (() => {
+          const pictures = getProductPictures(selectedProductForPreview);
+          const currentImg = pictures[activePreviewImageIndex] || pictures[0];
+
+          return (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-md">
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                animate={{ scale: 1, opacity: 1, y: 0 }}
+                exit={{ scale: 0.9, opacity: 0, y: 20 }}
+                className="bg-white border border-red-100 w-full max-w-2xl rounded-3xl p-6 md:p-8 shadow-2xl relative max-h-[95vh] overflow-y-auto text-slate-800"
+              >
+                <button
+                  onClick={() => {
+                    setSelectedProductForPreview(null);
+                    setActivePreviewImageIndex(0);
+                  }}
+                  className="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-800 bg-slate-100 rounded-full cursor-pointer z-10"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+
+                {/* Header Category & Title */}
+                <div className="mb-4 text-left">
+                  <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                    <span className="inline-flex items-center gap-1 bg-red-50 border border-red-200 px-3 py-0.5 rounded-full text-xs font-extrabold text-[#CE1126]">
+                      <Tag className="w-3 h-3" />
+                      <span>{selectedProductForPreview.category}</span>
+                    </span>
+                    <span className="bg-slate-100 text-slate-700 text-xs font-bold px-3 py-0.5 rounded-full">
+                      Condition: {selectedProductForPreview.condition}
+                    </span>
+                  </div>
+                  <h2 className="text-xl md:text-2xl font-black text-slate-900 leading-snug">
+                    {selectedProductForPreview.title}
+                  </h2>
+                </div>
+
+                {/* Gallery: Main Image + At Most 5 Pictures Thumbnail Switcher */}
+                <div className="space-y-3 mb-6">
+                  {/* Main Large Preview Image */}
+                  <div className="relative h-64 md:h-80 w-full rounded-2xl overflow-hidden bg-slate-100 border border-slate-200 shadow-inner">
+                    <img
+                      src={currentImg}
+                      alt={selectedProductForPreview.title}
+                      className="w-full h-full object-cover"
+                      referrerPolicy="no-referrer"
+                    />
+                    <div className="absolute top-3 left-3 bg-[#CE1126] text-white font-black text-sm px-3.5 py-1.5 rounded-full shadow-md">
+                      GHS {selectedProductForPreview.price}
+                    </div>
+                    <div className="absolute bottom-3 right-3 bg-slate-900/80 text-white font-bold text-xs px-3 py-1 rounded-full backdrop-blur-sm">
+                      Picture {activePreviewImageIndex + 1} of {pictures.length} (Max 5 Pictures)
+                    </div>
+                  </div>
+
+                  {/* Thumbnail Selector (At most 5 pictures) */}
+                  <div className="flex items-center gap-2.5 overflow-x-auto pb-1">
+                    {pictures.map((picUrl, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => setActivePreviewImageIndex(idx)}
+                        className={`relative w-16 h-16 md:w-20 md:h-20 rounded-xl overflow-hidden shrink-0 border-2 transition-all cursor-pointer ${
+                          activePreviewImageIndex === idx
+                            ? 'border-[#CE1126] ring-2 ring-[#CE1126]/30 scale-105 shadow-md'
+                            : 'border-slate-200 opacity-70 hover:opacity-100'
+                        }`}
+                      >
+                        <img
+                          src={picUrl}
+                          alt={`Thumbnail ${idx + 1}`}
+                          className="w-full h-full object-cover"
+                          referrerPolicy="no-referrer"
+                        />
+                        <div className="absolute bottom-0.5 right-0.5 bg-black/60 text-white font-mono text-[9px] px-1 rounded">
+                          {idx + 1}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Detailed Information Section */}
+                <div className="space-y-4 text-left">
+                  <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-2">
+                    <h4 className="text-xs font-black uppercase text-[#CE1126] tracking-wider">Item Details & Specifications</h4>
+                    <p className="text-xs text-slate-700 leading-relaxed font-medium">
+                      {selectedProductForPreview.description || 'No additional description provided for this campus listing.'}
+                    </p>
+                  </div>
+
+                  {/* Seller & Location Info */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                    <div className="p-3.5 bg-red-50/60 border border-red-100 rounded-2xl space-y-1">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase">Seller / Vendor</span>
+                      <p className="font-extrabold text-slate-900 flex items-center gap-1.5">
+                        <User className="w-4 h-4 text-[#CE1126]" />
+                        {selectedProductForPreview.sellerName}
+                        <span className="text-[10px] bg-red-100 text-[#CE1126] px-2 py-0.2 rounded-full font-bold ml-1">
+                          {selectedProductForPreview.sellerRole}
+                        </span>
+                      </p>
+                    </div>
+
+                    <div className="p-3.5 bg-blue-50/60 border border-blue-100 rounded-2xl space-y-1">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase">Campus Meetup Location</span>
+                      <p className="font-extrabold text-slate-900 flex items-center gap-1.5">
+                        <MapPin className="w-4 h-4 text-blue-600" />
+                        {selectedProductForPreview.locationOnCampus}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Modal Action Footer */}
+                <div className="mt-6 pt-4 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3">
+                  <a
+                    href={`https://wa.me/${selectedProductForPreview.sellerContact?.replace(/[^0-9]/g, '')}?text=Hello%20${encodeURIComponent(selectedProductForPreview.sellerName)},%20I%20am%20interested%20in%20your%20Central%20Mall%20listing:%20${encodeURIComponent(selectedProductForPreview.title)}%20(GHS%20${selectedProductForPreview.price})`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex-1 min-w-[140px] py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-full shadow-md flex items-center justify-center gap-1.5 cursor-pointer transition-all"
+                  >
+                    <Phone className="w-4 h-4" />
+                    <span>WhatsApp Seller</span>
+                  </a>
+
+                  <button
+                    onClick={() => {
+                      addToCart(selectedProductForPreview);
+                      setSelectedProductForPreview(null);
+                      setActivePreviewImageIndex(0);
+                    }}
+                    className="flex-1 min-w-[140px] py-3 bg-[#CE1126] hover:bg-[#A00D1D] text-white font-extrabold text-xs rounded-full shadow-lg shadow-red-200 cursor-pointer flex items-center justify-center gap-1.5 transition-all"
+                  >
+                    <ShoppingCart className="w-4 h-4" />
+                    <span>Add to Cart (GHS {selectedProductForPreview.price})</span>
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+          );
+        })()}
+      </AnimatePresence>
+
+      {/* ======================================================== */}
       {/* MODAL 1: LIST ITEM TO SELL (WITH PICTURE INSERTION) */}
       {/* ======================================================== */}
       <AnimatePresence>
@@ -1111,6 +1334,71 @@ export const ShopView: React.FC<ShopViewProps> = ({
                         </button>
                       ))}
                     </div>
+                  </div>
+                </div>
+
+                {/* ADDITIONAL PREVIEW PICTURES (UP TO 4) */}
+                <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-2.5">
+                  <label className="block text-xs font-extrabold text-slate-800">
+                    Additional Preview Pictures (Up to 4 Additional Photos for Item Preview Gallery)
+                  </label>
+                  <p className="text-[11px] text-slate-500 font-medium">
+                    Upload photos from your device or paste web links for extra item preview angles.
+                  </p>
+                  <div className="space-y-2">
+                    {[0, 1, 2, 3].map((idx) => {
+                      const imgVal = additionalImages[idx] || '';
+                      return (
+                        <div key={idx} className="flex items-center gap-2">
+                          <span className="text-xs font-mono font-extrabold text-slate-400 w-5 text-right shrink-0">
+                            #{idx + 2}
+                          </span>
+                          <input
+                            type="url"
+                            placeholder={`Additional preview picture URL ${idx + 1} (optional)...`}
+                            value={imgVal}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setAdditionalImages((prev) => {
+                                const next = [...prev];
+                                next[idx] = val;
+                                return next;
+                              });
+                            }}
+                            className="flex-1 px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#CE1126]"
+                          />
+                          <label className="shrink-0 flex items-center gap-1 px-3 py-2 bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs rounded-xl cursor-pointer shadow-sm transition-all">
+                            <Upload className="w-3.5 h-3.5" />
+                            <span>Choose File</span>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={(e) => handleAdditionalImageFileUpload(idx, e)}
+                              className="hidden"
+                            />
+                          </label>
+                          {imgVal ? (
+                            <div className="relative w-8 h-8 rounded-lg overflow-hidden shrink-0 border border-slate-300">
+                              <img src={imgVal} alt={`Preview ${idx + 2}`} className="w-full h-full object-cover" />
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setAdditionalImages((prev) => {
+                                    const next = [...prev];
+                                    next[idx] = '';
+                                    return next;
+                                  });
+                                }}
+                                className="absolute inset-0 bg-black/50 text-white hover:bg-red-600/80 flex items-center justify-center text-[10px] cursor-pointer"
+                                title="Clear Picture"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          ) : null}
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
 
@@ -1340,6 +1628,71 @@ export const ShopView: React.FC<ShopViewProps> = ({
                       }}
                       className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#CE1126]"
                     />
+                  </div>
+                </div>
+
+                {/* ADDITIONAL PREVIEW PICTURES (UP TO 4) */}
+                <div className="p-4 bg-slate-50 border border-amber-200 rounded-2xl space-y-2.5">
+                  <label className="block text-xs font-extrabold text-slate-800">
+                    Additional Preview Pictures (Up to 4 Additional Photos for Item Preview Gallery)
+                  </label>
+                  <p className="text-[11px] text-slate-500 font-medium">
+                    Upload new photos from your device or paste web links to update preview gallery photos.
+                  </p>
+                  <div className="space-y-2">
+                    {[0, 1, 2, 3].map((idx) => {
+                      const imgVal = editAdditionalImages[idx] || '';
+                      return (
+                        <div key={idx} className="flex items-center gap-2">
+                          <span className="text-xs font-mono font-extrabold text-slate-400 w-5 text-right shrink-0">
+                            #{idx + 2}
+                          </span>
+                          <input
+                            type="url"
+                            placeholder={`Additional preview picture URL ${idx + 1} (optional)...`}
+                            value={imgVal}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setEditAdditionalImages((prev) => {
+                                const next = [...prev];
+                                next[idx] = val;
+                                return next;
+                              });
+                            }}
+                            className="flex-1 px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#CE1126]"
+                          />
+                          <label className="shrink-0 flex items-center gap-1 px-3 py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs rounded-xl cursor-pointer shadow-sm transition-all">
+                            <Upload className="w-3.5 h-3.5" />
+                            <span>Choose File</span>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={(e) => handleEditAdditionalImageFileUpload(idx, e)}
+                              className="hidden"
+                            />
+                          </label>
+                          {imgVal ? (
+                            <div className="relative w-8 h-8 rounded-lg overflow-hidden shrink-0 border border-slate-300">
+                              <img src={imgVal} alt={`Edit Preview ${idx + 2}`} className="w-full h-full object-cover" />
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditAdditionalImages((prev) => {
+                                    const next = [...prev];
+                                    next[idx] = '';
+                                    return next;
+                                  });
+                                }}
+                                className="absolute inset-0 bg-black/50 text-white hover:bg-red-600/80 flex items-center justify-center text-[10px] cursor-pointer"
+                                title="Clear Picture"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          ) : null}
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
 
