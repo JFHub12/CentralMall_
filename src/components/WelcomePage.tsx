@@ -11,7 +11,7 @@ export const WelcomePage: React.FC<WelcomePageProps> = ({ onEnter }) => {
   const { theme } = useTheme();
   const isDark = theme === 'dark';
 
-  const lightBgUrl = 'https://res.cloudinary.com/jsg7ebov/image/upload/v1792975977/central.jpg';
+  const lightBgUrl = 'https://res.cloudinary.com/jsg7ebov/image/upload/v1793393563/eagle.jpg';
   const darkBgUrl = 'https://res.cloudinary.com/jsg7ebov/image/upload/v1791646024/images_1.jpg';
 
   return (
@@ -20,8 +20,11 @@ export const WelcomePage: React.FC<WelcomePageProps> = ({ onEnter }) => {
     }`}>
       {/* Background Image with Theme-Aware Overlay */}
       <div 
-        className="absolute inset-0 bg-cover bg-center bg-no-repeat transition-all duration-700 z-[-2]"
-        style={{ backgroundImage: `url('${isDark ? darkBgUrl : lightBgUrl}')` }}
+        className="absolute inset-0 bg-cover bg-no-repeat transition-all duration-700 z-[-2]"
+        style={{ 
+          backgroundImage: `url('${isDark ? darkBgUrl : lightBgUrl}')`,
+          backgroundPosition: isDark ? 'center center' : '34% 50%'
+        }}
       />
       <div 
         className={`absolute inset-0 transition-colors duration-500 z-[-1] ${

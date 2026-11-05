@@ -10,6 +10,7 @@ const NOTICES_FILE = path.join(DATA_DIR, 'stored_notices.json');
 const ORDERS_FILE = path.join(DATA_DIR, 'stored_orders.json');
 const APPOINTMENTS_FILE = path.join(DATA_DIR, 'stored_appointments.json');
 const API_CONFIG_FILE = path.join(DATA_DIR, 'stored_api_config.json');
+const USERS_FILE = path.join(DATA_DIR, 'stored_users.json');
 
 // Visual mask representation so credentials are not exposed in plaintext or code:
 export const MASKED_CHATBOT_KEY_DISPLAY = 'sk-or-v1-********************************';
@@ -99,7 +100,39 @@ interface UserAccount {
   createdAt: string;
 }
 
-const users: Map<string, UserAccount> = new Map();
+function loadUserStore(): Map<string, UserAccount> {
+  const map = new Map<string, UserAccount>();
+  try {
+    if (fs.existsSync(USERS_FILE)) {
+      const raw = fs.readFileSync(USERS_FILE, 'utf-8');
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        for (const u of parsed) {
+          if (u.email) {
+            map.set(u.email.toLowerCase(), u);
+          }
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('[UserStore] Failed to load users file:', e);
+  }
+  return map;
+}
+
+function saveUserStore(map: Map<string, UserAccount>) {
+  try {
+    if (!fs.existsSync(DATA_DIR)) {
+      fs.mkdirSync(DATA_DIR, { recursive: true });
+    }
+    const list = Array.from(map.values());
+    fs.writeFileSync(USERS_FILE, JSON.stringify(list, null, 2), 'utf-8');
+  } catch (e) {
+    console.error('[UserStore] Failed to save users file:', e);
+  }
+}
+
+const users: Map<string, UserAccount> = loadUserStore();
 
 function detectGenderFromName(name: string): 'male' | 'female' {
   if (!name) return 'male';
@@ -405,83 +438,75 @@ function getFallbackClinicReply(query: string): { reply: string; suggestedAction
 }
 
 // Function to invoke OpenRouter API with graceful fallback
-async function callOpenRouter(
+function callOpenRouter(
   messages: OpenRouterChatMessage[],
   systemPrompt: string,
   modelOverride?: string
 ): Promise<{ text: string; modelUsed: string; isRealOpenRouter: boolean }> {
-  const { key: rawApiKey, isConfigured, model: defaultModel } = getActiveChatbotApiKey();
-  const model = modelOverride || defaultModel || 'openai/gpt-4o-mini';
+  const { key: rawApiKey, model: defaultModel } = getActiveChatbotApiKey();
+  const model = modelOverride || defaultModel || 'google/gemini-2.0-flash-lite-001';
   const siteUrl = process.env.OPENROUTER_SITE_URL || process.env.APP_URL || 'https://central.edu.gh';
   const siteName = process.env.OPENROUTER_SITE_NAME || 'Central University Campus Mall';
+  const lastUserMessage = messages.slice().reverse().find(m => m.role === 'user')?.content || '';
 
-  if (!isConfigured) {
-    console.log(`[OpenRouter] Using campus AI engine with secured API mask: ${MASKED_CHATBOT_KEY_DISPLAY}`);
-    const lastUserMessage = messages.slice().reverse().find(m => m.role === 'user')?.content || '';
-    const fallbackText = getFallbackCampusReply(lastUserMessage);
-    return { text: fallbackText, modelUsed: 'central-campus-knowledge-base', isRealOpenRouter: false };
-  }
+  return (async () => {
+    try {
+      const formattedMessages: OpenRouterChatMessage[] = [
+        { role: 'system', content: systemPrompt },
+        ...messages
+      ];
 
-  try {
-    const formattedMessages: OpenRouterChatMessage[] = [
-      { role: 'system', content: systemPrompt },
-      ...messages
-    ];
-
-    console.log(`[OpenRouter] Requesting completion with model: ${model} (Key Mask: ${MASKED_CHATBOT_KEY_DISPLAY})`);
-
-    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${rawApiKey}`,
+      const headers: Record<string, string> = {
         'Content-Type': 'application/json',
         'HTTP-Referer': siteUrl,
         'X-Title': siteName,
-      },
-      body: JSON.stringify({
-        model: model,
-        messages: formattedMessages,
-        temperature: 0.7,
-        max_tokens: 1200,
-      }),
-      signal: AbortSignal.timeout(18000), // 18s timeout guard
-    });
+      };
 
-    if (!response.ok) {
-      console.warn(`[OpenRouter] API notice ${response.status}: Using verified campus intelligence engine.`);
-      const lastUserMessage = messages.slice().reverse().find(m => m.role === 'user')?.content || '';
-      return { 
-        text: getFallbackCampusReply(lastUserMessage), 
-        modelUsed: 'central-campus-knowledge-base (openrouter-fallback)', 
-        isRealOpenRouter: false 
+      if (rawApiKey) {
+        headers['Authorization'] = `Bearer ${rawApiKey}`;
+      }
+
+      console.log(`[OpenRouter] Requesting AI response with model: ${model}`);
+
+      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          model: model,
+          messages: formattedMessages,
+          temperature: 0.7,
+          max_tokens: 1200,
+        }),
+        signal: AbortSignal.timeout(12000), // 12s timeout
+      });
+
+      if (response.ok) {
+        const json = await response.json() as any;
+        const content = json?.choices?.[0]?.message?.content?.trim();
+        if (content) {
+          return {
+            text: content,
+            modelUsed: json?.model || model,
+            isRealOpenRouter: true
+          };
+        }
+      }
+
+      console.log(`[OpenRouter] API returned status ${response.status}. Using Central AI knowledge base.`);
+      return {
+        text: getFallbackCampusReply(lastUserMessage),
+        modelUsed: 'central-campus-knowledge-base',
+        isRealOpenRouter: false
+      };
+    } catch (error) {
+      console.warn('[OpenRouter] Network request notice, seamlessly utilizing Central AI knowledge base:', error);
+      return {
+        text: getFallbackCampusReply(lastUserMessage),
+        modelUsed: 'central-campus-knowledge-base',
+        isRealOpenRouter: false
       };
     }
-
-    const json = await response.json() as any;
-    const content = json?.choices?.[0]?.message?.content?.trim();
-
-    if (content) {
-      return { 
-        text: content, 
-        modelUsed: json?.model || model, 
-        isRealOpenRouter: true 
-      };
-    }
-
-    const lastUserMessage = messages.slice().reverse().find(m => m.role === 'user')?.content || '';
-    return { 
-      text: getFallbackCampusReply(lastUserMessage), 
-      modelUsed: 'central-campus-knowledge-base', 
-      isRealOpenRouter: false 
-    };
-  } catch (error) {
-    const lastUserMessage = messages.slice().reverse().find(m => m.role === 'user')?.content || '';
-    return { 
-      text: getFallbackCampusReply(lastUserMessage), 
-      modelUsed: 'central-campus-knowledge-base', 
-      isRealOpenRouter: false 
-    };
-  }
+  })();
 }
 
 async function startServer() {
@@ -563,31 +588,27 @@ async function startServer() {
       success: true,
       message: 'Chatbot API credentials updated and secured with asterisk mask!',
       maskedKey: MASKED_CHATBOT_KEY_DISPLAY,
-      model: cfg.openRouterModel || 'openai/gpt-4o-mini'
+      model: cfg.openRouterModel || 'google/gemini-2.0-flash-lite-001'
     });
   });
 
   // Main Central University Campus AI Assistant Chatbox (used by AIChatBotModal.tsx)
   app.post(['/api/chat', '/api/ai/chat'], async (req, res) => {
+    const { message, messages: incomingMessages, model: requestedModel } = req.body || {};
+    let chatHistory: OpenRouterChatMessage[] = [];
+
+    if (Array.isArray(incomingMessages) && incomingMessages.length > 0) {
+      chatHistory = incomingMessages.map((m: any) => ({
+        role: m.role === 'assistant' ? 'assistant' : 'user',
+        content: String(m.content || m.text || ''),
+      }));
+    } else if (typeof message === 'string' && message.trim().length > 0) {
+      chatHistory = [{ role: 'user', content: message.trim() }];
+    } else {
+      chatHistory = [{ role: 'user', content: 'Hello' }];
+    }
+
     try {
-      const { message, messages: incomingMessages, model: requestedModel } = req.body || {};
-
-      let chatHistory: OpenRouterChatMessage[] = [];
-
-      if (Array.isArray(incomingMessages) && incomingMessages.length > 0) {
-        chatHistory = incomingMessages.map((m: any) => ({
-          role: m.role === 'assistant' ? 'assistant' : 'user',
-          content: String(m.content || m.text || ''),
-        }));
-      } else if (typeof message === 'string' && message.trim().length > 0) {
-        chatHistory = [{ role: 'user', content: message.trim() }];
-      } else {
-        return res.status(400).json({ 
-          success: false, 
-          message: 'Message content is required.' 
-        });
-      }
-
       const result = await callOpenRouter(chatHistory, CENTRAL_CAMPUS_SYSTEM_PROMPT, requestedModel);
 
       return res.json({
@@ -598,11 +619,13 @@ async function startServer() {
         openrouterActive: result.isRealOpenRouter
       });
     } catch (err: any) {
-      console.error('[API /api/chat] Error:', err);
-      return res.status(500).json({
-        success: false,
-        reply: 'Sorry, I encountered an internal server error while generating an answer. Please try again in a moment.',
-        error: err?.message || 'Internal server error'
+      console.warn('[API /api/chat] Recovered gracefully with Central AI Knowledge Base:', err);
+      const userText = typeof message === 'string' ? message : '';
+      return res.json({
+        success: true,
+        reply: getFallbackCampusReply(userText),
+        provider: 'central-knowledge-base',
+        model: 'central-campus-knowledge-base'
       });
     }
   });
@@ -1015,6 +1038,7 @@ async function startServer() {
     };
 
     users.set(normalizedEmail, newUser);
+    saveUserStore(users);
     console.log(`[AUTH] New user registered: ${normalizedEmail} (Gender: ${gender || 'none'})`);
 
     return res.status(201).json({

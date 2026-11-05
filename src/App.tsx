@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
+import { AnimatedLoader } from './components/AnimatedLoader';
 import { MovingBackground } from './components/MovingBackground';
 import { WelcomePage } from './components/WelcomePage';
 import { AuthPage } from './components/AuthPage';
@@ -14,6 +15,9 @@ import { User } from './types';
 import { Shield, Sparkles } from 'lucide-react';
 
 function AppContent() {
+  // Initial Animated Loader State
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
+
   // Page Flow State: 1 = Welcome, 2 = Auth, 3 = Dashboard, 'shop' | 'gps' | 'clinic' = Sub Views
   const [currentPage, setCurrentPage] = useState<'welcome' | 'auth' | 'dashboard' | 'shop' | 'gps' | 'clinic'>('welcome');
   const { theme } = useTheme();
@@ -61,15 +65,18 @@ function AppContent() {
     };
     const handleOpenPwaModal = () => setIsPwaModalOpen(true);
     const handleContentUpdated = () => setRefreshKey((prev) => prev + 1);
+    const handleReplayLoader = () => setIsInitialLoading(true);
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
     window.addEventListener('open-pwa-install', handleOpenPwaModal);
     window.addEventListener('central_mall_content_updated', handleContentUpdated);
+    window.addEventListener('trigger-app-loader', handleReplayLoader);
 
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
       window.removeEventListener('open-pwa-install', handleOpenPwaModal);
       window.removeEventListener('central_mall_content_updated', handleContentUpdated);
+      window.removeEventListener('trigger-app-loader', handleReplayLoader);
     };
   }, []);
 
@@ -141,6 +148,14 @@ function AppContent() {
         theme === 'dark' ? 'bg-[#090D16] text-slate-100' : 'bg-slate-50 text-slate-900'
       }`}
     >
+      {/* Animated Shopping Bag SVG App Loader */}
+      {isInitialLoading && (
+        <AnimatedLoader
+          duration={2800}
+          onFinish={() => setIsInitialLoading(false)}
+        />
+      )}
+
       {/* Animated Moving Background in School Red & White Theme */}
       <MovingBackground />
 

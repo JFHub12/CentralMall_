@@ -27,6 +27,74 @@ export const AIChatBotModal: React.FC<AIChatBotModalProps> = ({ isOpen, onClose,
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
 
+  const getClientFallbackReply = (query: string): string => {
+    const q = query.toLowerCase().trim();
+
+    if (/^(hi|hello|hey|good\s*(morning|afternoon|evening)|greetings|howdy)\b/.test(q) || q === 'hi' || q === 'hello') {
+      return `🏛️ **Hello & Welcome to Central AI!**
+
+I am your virtual assistant for **Central University Ghana** (Miotso Main Campus - [central.edu.gh](http://central.edu.gh/)).
+
+How can I assist you today?
+• 🏠 **Accommodation:** Trinity Hall, Destiny Hall, and off-campus private hostels.
+• 🎓 **Admissions:** WASSCE requirements, cut-offs, e-vouchers, and portal links.
+• 📚 **Academic Programs:** Law, Business (CBS), Medicine & Pharmacy, Engineering, and FASS.
+• 📍 **Campus Navigation:** Locations of Senate Building, Moot Court, Library, and Clinic.
+• 🛍️ **Central Mall:** Buying, selling products, uploading pictures, and MoMo payments.
+
+Feel free to ask any question!`;
+    }
+
+    if (q.includes('motto') || q.includes('slogan') || q.includes('chancellor') || q.includes('otabil')) {
+      return `🏛️ **Central University Identity & Leadership:**
+• **Motto:** "Faith, Integrity, Excellence"
+• **Founder & Chancellor:** Dr. Mensa Otabil
+• **Main Campus:** Miotso Main Campus (Accra-Aflao Highway, near Dawhenya/Prampram)
+• **Official Portal:** http://central.edu.gh/`;
+    }
+
+    if (q.includes('admission') || q.includes('apply') || q.includes('requirement') || q.includes('voucher') || q.includes('wassce')) {
+      return `🎓 **Central University Admissions Guide (http://central.edu.gh/):**
+• **WASSCE Requirements:** Passes (A1-C6) in 3 core subjects plus 3 electives (Aggregate 36 or better).
+• **E-Voucher:** GH¢200 via https://central.edu.gh/ or USSD *887*9#.
+• **Admissions Office:** Senate Building Ground Floor, Miotso Main Campus.`;
+    }
+
+    if (q.includes('faculty') || q.includes('course') || q.includes('law') || q.includes('pharmacy') || q.includes('nursing') || q.includes('business') || q.includes('computer')) {
+      return `📚 **Faculties & Programs at Central University:**
+• **Central Business School (CBS):** B.Sc. Administration (Accounting, Finance, Marketing, HRM).
+• **Faculty of Law:** Accredited LL.B with state-of-the-art Moot Court.
+• **School of Medicine & Health Sciences:** Pharm D, Nursing, Physician Assistantship.
+• **Faculty of Engineering & Applied Sciences:** Computer Science, IT, Civil Engineering, Architecture.`;
+    }
+
+    if (q.includes('trinity') || q.includes('destiny') || q.includes('hostel') || q.includes('residence')) {
+      return `🏠 **Campus Accommodation & Hostels:**
+• **Trinity Hall (TRN-01):** On-campus male residence near Central Clinic.
+• **Destiny Hall (DST-01):** On-campus female residence with private study gardens.
+• **Off-Campus Hostels:** Private accredited hostels in Dawhenya & Prampram.`;
+    }
+
+    if (q.includes('sell') || q.includes('mall') || q.includes('buy') || q.includes('product') || q.includes('picture')) {
+      return `🛍️ **Central Mall Marketplace:**
+• Click **"+ List Item to Sell"** to publish items.
+• Upload custom photos directly from your phone/laptop or paste image URLs.
+• Buyers connect directly with sellers via WhatsApp and Mobile Money (MoMo).`;
+    }
+
+    return `🏛️ **Central AI Assistant (Central University Ghana):**
+
+Thank you for your question: "*${query}*"
+
+I am ready to help you with:
+• **Admissions & Entry Requirements** (WASSCE, cut-off points, e-vouchers)
+• **Faculties & Courses** (Law, Business, Pharmacy, Nursing, Computer Science)
+• **Campus Navigation & GPS** (Senate Building, Trinity Hall, Destiny Hall, Clinic)
+• **Central Mall Marketplace** (Buying, selling, photo uploads)
+
+What specific details would you like to explore next?`;
+  };
+
   const handleSend = async (textToSend?: string) => {
     const text = textToSend || input;
     if (!text.trim()) return;
@@ -49,31 +117,36 @@ export const AIChatBotModal: React.FC<AIChatBotModalProps> = ({ isOpen, onClose,
         body: JSON.stringify({ message: text.trim() }),
       });
 
-      if (!res.ok) {
-        throw new Error(`HTTP error ${res.status}`);
+      let replyText = '';
+      if (res.ok) {
+        const ct = res.headers.get('content-type') || '';
+        if (ct.includes('application/json')) {
+          const data = await res.json().catch(() => ({}));
+          replyText = data.reply || '';
+        }
       }
-      const ct = res.headers.get('content-type') || '';
-      if (!ct.includes('application/json')) {
-        throw new Error('Expected JSON response from chat API');
+
+      if (!replyText) {
+        replyText = getClientFallbackReply(text.trim());
       }
-      const data = await res.json();
+
       const assistantMsg: ChatMessage = {
         id: `m-${Date.now() + 1}`,
         sender: 'assistant',
-        text: data.reply || 'Central AI is ready to answer any questions about Central University Miotso campus.',
+        text: replyText,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };
 
       setMessages((prev) => [...prev, assistantMsg]);
     } catch (err) {
-      console.error('AI Assistant Error', err);
-      const errMsg: ChatMessage = {
+      console.warn('AI Assistant notice, using client intelligence fallback:', err);
+      const fallbackMsg: ChatMessage = {
         id: `m-${Date.now() + 1}`,
         sender: 'assistant',
-        text: 'Sorry, I encountered a temporary connection error. Please ask your question again.',
+        text: getClientFallbackReply(text.trim()),
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };
-      setMessages((prev) => [...prev, errMsg]);
+      setMessages((prev) => [...prev, fallbackMsg]);
     } finally {
       setLoading(false);
     }
