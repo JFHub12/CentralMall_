@@ -80,7 +80,7 @@ export const GPSView: React.FC<GPSViewProps> = ({ onBackToDashboard, initialSear
   // Navigator Start & Destination Lists
   const [startType, setStartType] = useState<'gps' | 'building'>('gps');
   const [startBuildingId, setStartBuildingId] = useState<string>('trinity-hall');
-  const [destBuildingId, setDestBuildingId] = useState<string>('clinic-1');
+  const [destBuildingId, setDestBuildingId] = useState<string>('senate-1');
   const [isNavigating, setIsNavigating] = useState(false);
   const [activeStepIndex, setActiveStepIndex] = useState<number>(0);
   const [routeData, setRouteData] = useState<CampusRouteResult | null>(null);

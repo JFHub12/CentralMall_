@@ -10,7 +10,7 @@ import { useTheme } from '../context/ThemeContext';
 import { PenBookLoading3D } from './PenBookLoading3D';
 
 interface CampusUpdatesCardProps {
-  onNavigateToOption?: (option: 'shop' | 'gps' | 'clinic', query?: string) => void;
+  onNavigateToOption?: (option: 'shop' | 'gps' | 'clinic' | 'ai', query?: string) => void;
   refreshTrigger?: number;
 }
 
@@ -454,12 +454,12 @@ export const CampusUpdatesCard: React.FC<CampusUpdatesCardProps> = ({ onNavigate
                         <button
                           onClick={() => {
                             setActiveNotice(null);
-                            onNavigateToOption('clinic');
+                            onNavigateToOption('ai');
                           }}
-                          className="px-3.5 py-2 rounded-xl text-xs font-extrabold bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-1.5 cursor-pointer shadow-sm"
+                          className="btn-neon-crimson px-3.5 py-2 rounded-xl text-xs font-extrabold text-white flex items-center gap-1.5 cursor-pointer shadow-sm"
                         >
-                          <Stethoscope className="w-3.5 h-3.5" />
-                          <span>Open School Clinic Desk</span>
+                          <Sparkles className="w-3.5 h-3.5" />
+                          <span>Ask CentralAI Assistant</span>
                         </button>
                       )}
 

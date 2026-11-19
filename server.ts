@@ -630,6 +630,111 @@ async function startServer() {
     }
   });
 
+  // CentralAI Dedicated Image Generation Studio API
+  app.post('/api/ai/generate-image', async (req, res) => {
+    try {
+      const { prompt, style = 'photorealistic', aspectRatio = '1:1' } = req.body || {};
+      if (!prompt || typeof prompt !== 'string' || !prompt.trim()) {
+        return res.status(400).json({ success: false, message: 'Image prompt is required.' });
+      }
+
+      const cleanPrompt = prompt.trim();
+      let width = 1024;
+      let height = 1024;
+
+      if (aspectRatio === '16:9') {
+        width = 1280;
+        height = 720;
+      } else if (aspectRatio === '9:16') {
+        width = 720;
+        height = 1280;
+      } else if (aspectRatio === '4:3') {
+        width = 1024;
+        height = 768;
+      } else if (aspectRatio === '3:2') {
+        width = 1200;
+        height = 800;
+      }
+
+      let styleModifier = '';
+      if (style === 'photorealistic') {
+        styleModifier = ', photorealistic 8k, ultra-detailed shot, realistic depth of field, hyper-detailed textures, cinematic natural lighting';
+      } else if (style === 'cinematic') {
+        styleModifier = ', cinematic movie scene, 35mm photograph, dramatic anamorphic lighting, rich color grading, IMAX quality';
+      } else if (style === 'anime') {
+        styleModifier = ', anime style, Makoto Shinkai and Studio Ghibli inspired, vibrant colors, clean lineart, luminous atmosphere, masterpiece';
+      } else if (style === 'digital-art') {
+        styleModifier = ', digital art illustration, trending on ArtStation, vivid color palette, concept art, high fantasy aesthetic';
+      } else if (style === '3d-render') {
+        styleModifier = ', 3D isometric render, Blender Cycles, octane render, soft studio lighting, smooth clay and glass materials';
+      } else if (style === 'cyberpunk') {
+        styleModifier = ', cyberpunk neon city aesthetic, volumetric glow, high tech, vivid magenta and cyan lighting, futuristic details';
+      } else if (style === 'oil-painting') {
+        styleModifier = ', classical oil painting, textured canvas brush strokes, Rembrandt lighting, rich museum quality';
+      }
+
+      const seed = Math.floor(Math.random() * 9000000) + 100000;
+      const combinedPrompt = `${cleanPrompt}${styleModifier}`;
+      const encoded = encodeURIComponent(combinedPrompt);
+      const imageUrl = `https://image.pollinations.ai/prompt/${encoded}?width=${width}&height=${height}&seed=${seed}&nologo=true`;
+
+      return res.json({
+        success: true,
+        id: `img-${Date.now()}`,
+        imageUrl,
+        prompt: cleanPrompt,
+        enhancedPrompt: combinedPrompt,
+        style,
+        aspectRatio,
+        seed,
+        createdAt: new Date().toISOString()
+      });
+    } catch (err: any) {
+      console.error('[API /api/ai/generate-image] Error:', err);
+      return res.status(500).json({ success: false, message: 'Image generation failed.' });
+    }
+  });
+
+  // CentralAI Dedicated Deep Academic Research API
+  app.post('/api/ai/research', async (req, res) => {
+    try {
+      const { topic, focus = 'academic' } = req.body || {};
+      const cleanTopic = typeof topic === 'string' ? topic.trim() : '';
+
+      if (!cleanTopic) {
+        return res.status(400).json({ success: false, message: 'Research topic is required.' });
+      }
+
+      const researchSystemPrompt = `You are CentralAI Senior Research Fellow, an elite academic research AI assistant for Central University Ghana (Miotso Main Campus).
+Your role is to produce rigorous, in-depth, publication-quality research breakdowns on any subject requested.
+Structure your research with:
+1. 📑 **Executive Abstract & Core Thesis**
+2. 🏛️ **Theoretical & Historical Background**
+3. 🔬 **In-Depth Analytical Breakdown & Key Findings** (include empirical data points, key arguments, and methodologies)
+4. 🌍 **African & Global Real-World Case Applications** (connect to Ghana / West Africa and global economy/society where relevant)
+5. ⚖️ **Critical Challenges, Counterarguments & Limitations**
+6. 📚 **Scholarly Conclusions & Recommended Citations / References**
+Format with clean markdown, bold subheadings, and clear bullet points.`;
+
+      const result = await callOpenRouter(
+        [{ role: 'user', content: `Perform an in-depth, rigorous research paper investigation on: "${cleanTopic}". Research focus: ${focus}.` }],
+        researchSystemPrompt
+      );
+
+      return res.json({
+        success: true,
+        topic: cleanTopic,
+        research: result.text,
+        provider: result.isRealOpenRouter ? 'openrouter' : 'central-knowledge-base',
+        model: result.modelUsed,
+        createdAt: new Date().toISOString()
+      });
+    } catch (err: any) {
+      console.error('[API /api/ai/research] Error:', err);
+      return res.status(500).json({ success: false, message: 'Research generation failed.' });
+    }
+  });
+
   // Clinic Virtual Triage Chatbox (used by ClinicView.tsx)
   app.post('/api/clinic/chat', async (req, res) => {
     try {

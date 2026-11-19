@@ -70,11 +70,11 @@ export interface CampusNotification {
   id: string;
   title: string;
   message: string;
-  category: 'market' | 'clinic' | 'gps' | 'general';
+  category: 'market' | 'clinic' | 'gps' | 'ai' | 'general';
   timestamp: string;
   timeAgo: string;
   read: boolean;
-  actionUrl?: 'shop' | 'gps' | 'clinic';
+  actionUrl?: 'shop' | 'gps' | 'clinic' | 'ai';
   actionLabel?: string;
   icon?: string;
 }
@@ -83,8 +83,8 @@ export interface ToastItem {
   id: string;
   title: string;
   message: string;
-  category: 'market' | 'clinic' | 'gps' | 'general';
-  actionUrl?: 'shop' | 'gps' | 'clinic';
+  category: 'market' | 'clinic' | 'gps' | 'ai' | 'general';
+  actionUrl?: 'shop' | 'gps' | 'clinic' | 'ai';
   actionLabel?: string;
   duration?: number;
 }

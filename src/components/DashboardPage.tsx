@@ -4,7 +4,7 @@ import {
   ShoppingBag, Navigation, Stethoscope, LogOut, Sparkles, MapPin, 
   ChevronRight, User as UserIcon, Search, Tag, X, ArrowUpRight, FileText, 
   Download, CloudSun, DollarSign, Thermometer, Camera, Edit3, CheckCircle2, Globe, PlusCircle,
-  Smartphone, Shield, Trash2
+  Smartphone, Shield, Trash2, Bot, Wand2
 } from 'lucide-react';
 import { User, Building, Product, detectGenderFromName } from '../types';
 import { CampusUpdatesCard } from './CampusUpdatesCard';
@@ -13,7 +13,7 @@ import { ActionTooltip } from './ActionTooltip';
 
 interface DashboardPageProps {
   user: User;
-  onSelectOption: (option: 'shop' | 'gps' | 'clinic', searchQuery?: string, openSellModal?: boolean) => void;
+  onSelectOption: (option: 'shop' | 'gps' | 'clinic' | 'ai', searchQuery?: string, openSellModal?: boolean) => void;
   onLogout: () => void;
   onOpenAIChat: () => void;
   refreshTrigger?: number;
@@ -365,7 +365,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
             <Search className="absolute left-4 top-3.5 w-5 h-5 text-[#CE1126]" />
             <input
               type="text"
-              placeholder="Search buildings (Senate, Trinity), textbooks, laptops, clinics..."
+              placeholder="Search campus marketplace, buildings (Senate, Trinity), CentralAI research..."
               value={globalSearch}
               onChange={(e) => setGlobalSearch(e.target.value)}
               className={`w-full pl-12 pr-10 py-3.5 border-2 rounded-2xl text-sm transition-all focus:outline-none focus:border-[#CE1126] shadow-lg ${
@@ -583,41 +583,41 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
             </div>
           </motion.div>
 
-          {/* OPTION 3: CLINIC */}
+          {/* OPTION 3: CENTRAL AI */}
           <motion.div
             whileHover={{ y: -6, scale: 1.02 }}
             transition={{ type: 'spring', stiffness: 300 }}
-            onClick={() => onSelectOption('clinic')}
-            id="dashboard-card-clinic"
+            onClick={() => onSelectOption('ai')}
+            id="dashboard-card-central-ai"
             className={`rounded-3xl p-6 md:p-8 backdrop-blur-xl shadow-xl transition-all cursor-pointer flex flex-col justify-between overflow-hidden text-left border group ${
               isDark
-                ? 'neon-cu-card border-slate-800'
+                ? 'neon-cu-card border-slate-800 hover:border-[#ff073a]'
                 : 'bg-white border-red-200/80 shadow-red-100/50 hover:shadow-2xl hover:border-[#CE1126]'
             }`}
           >
             <div>
-              <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-5 transition-colors duration-300 ${
+              <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-5 transition-all duration-300 ${
                 isDark
-                  ? 'bg-emerald-950/60 border border-emerald-500/40 text-emerald-400 group-hover:bg-[#ff073a] group-hover:text-white shadow-[0_0_15px_rgba(16,185,129,0.3)]'
-                  : 'bg-emerald-50 border border-emerald-200 text-emerald-700 group-hover:bg-[#CE1126] group-hover:text-white shadow-sm'
+                  ? 'bg-slate-800/80 border border-slate-700 text-slate-300 group-hover:bg-[#ff073a] group-hover:text-white group-hover:border-[#ff073a] group-hover:shadow-[0_0_20px_rgba(255,7,58,0.4)]'
+                  : 'bg-slate-50 border border-slate-200 text-slate-700 group-hover:bg-[#CE1126] group-hover:text-white group-hover:border-[#CE1126] shadow-sm group-hover:shadow-md group-hover:shadow-red-200'
               }`}>
-                <Stethoscope className="w-7 h-7" />
+                <Bot className="w-7 h-7 transition-transform duration-300 group-hover:scale-110" />
               </div>
-              <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-600 mb-1">
-                <span>Ghana Health Service (GHS)</span>
+              <div className="flex items-center gap-1.5 text-xs font-bold text-[#ff073a] mb-1">
+                <span>CentralAI 2.0</span>
                 <span className={`text-[10px] px-1.5 py-0.2 rounded font-bold ${
-                  isDark ? 'bg-emerald-950 text-emerald-300 border border-emerald-800' : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                  isDark ? 'bg-red-950 text-rose-300 border border-red-800' : 'bg-red-50 text-[#CE1126] border border-red-200'
                 }`}>
-                  NHIS
+                  Research & Image Gen
                 </span>
               </div>
               <h3 className={`text-xl font-black mb-2 transition-colors ${
                 isDark ? 'text-white group-hover:text-[#ff073a]' : 'text-slate-900 group-hover:text-[#CE1126]'
               }`}>
-                School Clinic & Triage
+                CentralAI Workspace
               </h3>
               <p className={`text-xs font-medium leading-relaxed mb-6 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
-                24/7 medical triage based on GHS clinical protocols, malaria rapid diagnosis, emergency ambulance dispatch, and doctor appointments.
+                Ask any question, conduct deep academic research, generate high-definition AI images, write code, and chat freely with your university AI assistant.
               </p>
             </div>
 
@@ -625,7 +625,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
               <span className={`text-xs font-extrabold transition-colors ${
                 isDark ? 'text-slate-300 group-hover:text-[#ff073a]' : 'text-slate-700 group-hover:text-[#CE1126]'
               }`}>
-                Consult Clinic Nurse
+                Launch CentralAI
               </span>
               <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${
                 isDark ? 'bg-gray-800 text-slate-300 group-hover:bg-[#ff073a] group-hover:text-white' : 'bg-slate-100 text-slate-700 group-hover:bg-[#CE1126] group-hover:text-white'

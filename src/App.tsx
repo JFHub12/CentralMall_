@@ -7,7 +7,7 @@ import { AuthPage } from './components/AuthPage';
 import { DashboardPage } from './components/DashboardPage';
 import { ShopView } from './components/ShopView';
 import { GPSView } from './components/GPSView';
-import { ClinicView } from './components/ClinicView';
+import { CentralAIView } from './components/CentralAIView';
 import { AIChatBotModal } from './components/AIChatBotModal';
 import { AdminConsoleModal } from './components/AdminConsoleModal';
 import { PWAInstallModal } from './components/PWAInstallModal';
@@ -18,8 +18,8 @@ function AppContent() {
   // Initial Animated Loader State
   const [isInitialLoading, setIsInitialLoading] = useState(true);
 
-  // Page Flow State: 1 = Welcome, 2 = Auth, 3 = Dashboard, 'shop' | 'gps' | 'clinic' = Sub Views
-  const [currentPage, setCurrentPage] = useState<'welcome' | 'auth' | 'dashboard' | 'shop' | 'gps' | 'clinic'>('welcome');
+  // Page Flow State: 1 = Welcome, 2 = Auth, 3 = Dashboard, 'shop' | 'gps' | 'ai' = Sub Views
+  const [currentPage, setCurrentPage] = useState<'welcome' | 'auth' | 'dashboard' | 'shop' | 'gps' | 'clinic' | 'ai'>('welcome');
   const { theme } = useTheme();
   
   // User Authentication State with localStorage session restoration
@@ -126,7 +126,7 @@ function AppContent() {
     setCurrentPage('dashboard');
   };
 
-  const handleSelectDashboardOption = (option: 'shop' | 'gps' | 'clinic', query = '', openSellModal = false) => {
+  const handleSelectDashboardOption = (option: 'shop' | 'gps' | 'clinic' | 'ai', query = '', openSellModal = false) => {
     setActiveSearchQuery(query);
     setOpenSellDirectly(openSellModal);
     setCurrentPage(option);
@@ -201,9 +201,9 @@ function AppContent() {
           />
         )}
 
-        {currentPage === 'clinic' && user && (
-          <ClinicView
-            key={`clinic-${refreshKey}`}
+        {(currentPage === 'ai' || currentPage === 'clinic') && user && (
+          <CentralAIView
+            key={`central-ai-${refreshKey}`}
             user={user}
             onBackToDashboard={() => setCurrentPage('dashboard')}
           />

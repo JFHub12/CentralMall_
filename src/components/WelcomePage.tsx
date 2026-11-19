@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'motion/react';
-import { ShoppingBag, Navigation, Stethoscope, ArrowRight, ShieldCheck, Sparkles, MapPin, Smartphone } from 'lucide-react';
+import { ShoppingBag, Navigation, Bot, ArrowRight, ShieldCheck, Sparkles, MapPin, Smartphone } from 'lucide-react';
 import { useTheme, ThemeToggle } from '../context/ThemeContext';
 
 interface WelcomePageProps {
@@ -126,7 +126,7 @@ export const WelcomePage: React.FC<WelcomePageProps> = ({ onEnter }) => {
             isDark ? 'text-slate-300' : 'text-slate-700'
           }`}
         >
-          Your high-speed digital campus ecosystem for Central University, Miotso. Buy & sell freely, navigate the campus via real road GPS, and access 24/7 clinic consultations.
+          Your high-speed digital campus ecosystem for Central University, Miotso. Buy & sell freely, navigate the campus via real road GPS, and power your academic life with CentralAI research, image generation & chat.
         </motion.p>
 
         {/* Feature Highlights Grid */}
@@ -184,27 +184,27 @@ export const WelcomePage: React.FC<WelcomePageProps> = ({ onEnter }) => {
             </p>
           </div>
 
-          {/* Clinic Card */}
+          {/* CentralAI Card */}
           <div className={`p-6 rounded-3xl backdrop-blur-md transition-all hover:-translate-y-1 group ${
             isDark
               ? 'neon-cu-card'
               : 'bg-white/90 border border-red-200/80 shadow-lg shadow-red-100/50 hover:shadow-xl hover:border-red-300'
           }`}>
-            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center mb-4 transition-colors ${
+            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center mb-4 transition-all duration-300 ${
               isDark
-                ? 'bg-emerald-950/60 border border-emerald-500/40 text-emerald-400 group-hover:bg-[#ff073a] group-hover:text-white shadow-[0_0_15px_rgba(16,185,129,0.3)]'
-                : 'bg-emerald-50 border border-emerald-200 text-emerald-700 group-hover:bg-[#CE1126] group-hover:text-white shadow-sm'
+                ? 'bg-slate-800/80 border border-slate-700 text-slate-300 group-hover:bg-[#ff073a] group-hover:text-white group-hover:border-[#ff073a] group-hover:shadow-[0_0_15px_rgba(255,7,58,0.4)]'
+                : 'bg-slate-50 border border-slate-200 text-slate-700 group-hover:bg-[#CE1126] group-hover:text-white group-hover:border-[#CE1126] shadow-sm group-hover:shadow-md group-hover:shadow-red-200'
             }`}>
-              <Stethoscope className="w-6 h-6" />
+              <Bot className="w-6 h-6 transition-transform duration-300 group-hover:scale-110" />
             </div>
             <h3 className={`text-lg font-bold mb-1.5 flex items-center justify-between ${
               isDark ? 'text-white' : 'text-slate-900'
             }`}>
-              <span>School Clinic OPD</span>
-              <span className={`text-[10px] font-mono font-bold ${isDark ? 'text-rose-300' : 'text-[#CE1126]'}`}>24/7 GHS</span>
+              <span>CentralAI Workspace</span>
+              <span className={`text-[10px] font-mono font-bold ${isDark ? 'text-rose-300' : 'text-[#CE1126]'}`}>AI 2.0</span>
             </h3>
             <p className={`text-xs leading-relaxed font-medium ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
-              Consult with clinic nurses, access Ghana Health Service tips, and request emergency triage.
+              Ask any question, generate high-definition AI images, run deep academic research, and solve complex code & math.
             </p>
           </div>
         </motion.div>

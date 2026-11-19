@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 
 interface NotificationToastSystemProps {
-  onNavigate?: (view: 'shop' | 'gps' | 'clinic', query?: string) => void;
+  onNavigate?: (view: 'shop' | 'gps' | 'clinic' | 'ai', query?: string) => void;
 }
 
 // Notifications removed as per user requirement
